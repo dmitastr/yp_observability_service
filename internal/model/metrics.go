@@ -17,3 +17,11 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 	Hash  string   `json:"hash,omitempty"`
 }
+
+func (m *Metrics) DeltaSet(value *int64) {
+	if m.Delta == nil {
+		m.Delta = value
+		return
+	}
+	*m.Delta += *value
+}
