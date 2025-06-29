@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dmitastr/yp_observability_service/internal/service"
 	"github.com/dmitastr/yp_observability_service/internal/handlers/update"
+	"github.com/dmitastr/yp_observability_service/internal/service"
 )
 
 type MetricHandler struct {
@@ -29,18 +29,17 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	fmt.Printf("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
 
 	if err := upd.IsValid(); err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		http.Error(res, err.Error(), http.StatusNotFound)
 		return
 	}
-	
+
 	err := handler.service.ProcessUpdate(upd)
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	res.WriteHeader(http.StatusOK)
-
 
 }

@@ -3,8 +3,8 @@ package update
 import "github.com/dmitastr/yp_observability_service/internal/errs"
 
 type MetricUpdate struct {
-	MType string
-	MetricName string
+	MType       string
+	MetricName  string
 	MetricValue string
 }
 
