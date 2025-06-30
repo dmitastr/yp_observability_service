@@ -126,7 +126,7 @@ func (agent *Agent) SendMetric(key string) error {
 	for i := range len(pathParams) {
 		args[i+1] = pathParams[i]
 	}
-	url := fmt.Sprintf("%s/update/%s/%s/%s", args...)
+	url := fmt.Sprintf(`%s/update/%s/%s/%s`, args...)
 
 	if _, err := agent.Client.Post(url, "text/plain", nil); err != nil {
 		return err
