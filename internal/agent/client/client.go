@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -42,10 +43,16 @@ import (
 type Agent struct {
 	Metrics map[string]metric.Metric
 	Client  http.Client
+	address string
 }
 
-func NewAgent() Agent {
-	return Agent{Metrics: make(map[string]metric.Metric), Client: http.Client{}}
+func NewAgent(address string) *Agent {
+	agent := Agent{
+		Metrics: make(map[string]metric.Metric), 
+		Client: http.Client{},
+		address: address,
+	}
+	return &agent
 }
 
 func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
@@ -108,9 +115,18 @@ func (agent *Agent) Update(pollInterval int) {
 }
 
 func (agent *Agent) SendMetric(key string) error {
-	metric := agent.Metrics[key]
+	metric, ok := agent.Metrics[key]
+	if !ok {
+		return errors.New("metric was not found")
+	}
 	pathParams := metric.ToString()
-	url := fmt.Sprintf("http://localhost:8080/update/%s/%s/%s", pathParams...)
+
+	args := make([]any, len(pathParams)+1)
+	args[0] = agent.address
+	for i := range len(pathParams) {
+		args[i+1] = pathParams[i]
+	}
+	url := fmt.Sprintf("%s/update/%s/%s/%s", args...)
 
 	if _, err := agent.Client.Post(url, "text/plain", nil); err != nil {
 		return err

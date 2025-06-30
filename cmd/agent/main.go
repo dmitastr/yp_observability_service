@@ -5,6 +5,6 @@ import (
 )
 
 func main() {
-	agent := client.NewAgent()
+	agent := client.NewAgent(`localhost:8080`)
 	agent.Run(2, 10)
 }
