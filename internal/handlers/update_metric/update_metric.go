@@ -36,7 +36,7 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	err := handler.service.ProcessUpdate(upd)
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 

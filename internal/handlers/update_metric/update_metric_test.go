@@ -76,7 +76,7 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 			name:     "Service returned an error",
 			method:   http.MethodPost,
 			url:      "/update/abc/10",
-			wantCode: http.StatusInternalServerError,
+			wantCode: http.StatusBadRequest,
 			pathParams: []pathParam{
 				{key: "name", value: "abc"},
 				{key: "mtype", value: "gauge"},
