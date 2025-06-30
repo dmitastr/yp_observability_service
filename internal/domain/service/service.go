@@ -1,22 +1,19 @@
 package service
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	"github.com/dmitastr/yp_observability_service/internal/repository"
-	"github.com/dmitastr/yp_observability_service/internal/handlers/update"
 )
 
 const (
 	GAUGE   = "gauge"
 	COUNTER = "counter"
 )
-
-type ServiceAbstract interface {
-	ProcessUpdate(update.MetricUpdate) error
-}
 
 type Service struct {
 	db repository.Database
@@ -47,4 +44,13 @@ func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
 	}
 	service.db.Update(metric)
 	return nil	
+}
+
+
+func (service Service) GetMetric(name, mType string) (metric *models.Metrics, err error) {
+	metric = service.db.Get(name)
+	if metric == nil {
+		err = errors.New("metric not found")
+	}
+	return metric, err
 }

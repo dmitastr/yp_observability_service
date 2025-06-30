@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/dmitastr/yp_observability_service/internal/handlers/update"
-	"github.com/dmitastr/yp_observability_service/internal/service"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 )
 
 type MetricHandler struct {
-	service service.ServiceAbstract
+	service srv.ServiceAbstract
 }
 
-func NewHandler(s service.ServiceAbstract) *MetricHandler {
+func NewHandler(s srv.ServiceAbstract) *MetricHandler {
 	return &MetricHandler{service: s}
 }
 

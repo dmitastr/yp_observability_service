@@ -1,5 +1,10 @@
 package models
 
+import (
+	"errors"
+	"strconv"
+)
+
 const (
 	Counter = "counter"
 	Gauge   = "gauge"
@@ -24,4 +29,15 @@ func (m *Metrics) DeltaSet(value *int64) {
 		return
 	}
 	*m.Delta += *value
+}
+
+func (m *Metrics) GetValueString() (val string, err error) {
+	if m.Delta != nil {
+		val = strconv.FormatInt(*m.Delta, 10)
+	} else if m.Value != nil {
+		val = strconv.FormatFloat(*m.Value, 'f', 6, 64)
+	} else {
+		err = errors.New("getting value from empty metric is not allowed")
+	}
+	return val, err
 }

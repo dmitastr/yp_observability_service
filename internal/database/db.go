@@ -73,3 +73,14 @@ func (storage *Storage) GetAll() []models.Metrics {
 	return storage.toList1()
 }
 
+
+
+func (storage *Storage) Get(key string) *models.Metrics {
+	if metric, ok := storage.Metrics[key]; ok {
+		val, _ := metric.GetValueString()
+		fmt.Printf("Found metric: name=%s, value=%s\n", metric.ID, val)
+		return &metric
+	}
+	return nil
+}
+

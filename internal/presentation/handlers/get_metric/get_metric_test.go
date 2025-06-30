@@ -1,28 +1,15 @@
-package updatemetric
+package getmetric
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/handlers/update"
+	"github.com/dmitastr/yp_observability_service/internal/domain/mock_service"
 	"github.com/stretchr/testify/assert"
 )
 
-type mocksService struct {
-	wantErr bool
-}
-
-func (s mocksService) ProcessUpdate(update.MetricUpdate) error {
-	if s.wantErr {
-		return errors.New("mock error")
-	}
-	return nil
-}
-
-func TestMetricHandler_ServeHTTP(t *testing.T) {
-
+func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 	type pathParam struct {
 		key   string
 		value string
@@ -31,72 +18,74 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 	tests := []struct {
 		name          string
 		method        string
-		url           string
 		wantCode      int
 		pathParams    []pathParam
+		wantErr bool
 		serviceErrOut bool
 	}{
 		{
 			name:     "Valid request",
-			method:   http.MethodPost,
-			url:      "/update/abc/10",
+			method:   http.MethodGet,
 			wantCode: http.StatusOK,
 			pathParams: []pathParam{
 				{key: "name", value: "abc"},
 				{key: "mtype", value: "gauge"},
-				{key: "value", value: "10"},
 			},
 			serviceErrOut: false,
+			wantErr: false,
 		},
 		{
-			name:     "Get method",
-			method:   http.MethodGet,
-			url:      "/update/abc/gauge/10",
+			name:     "POST method",
+			method:   http.MethodPost,
 			wantCode: http.StatusMethodNotAllowed,
 			pathParams: []pathParam{
 				{key: "name", value: "abc"},
 				{key: "mtype", value: "gauge"},
-				{key: "value", value: "10"},
 			},
 			serviceErrOut: false,
+			wantErr: true,
 		},
 		{
 			name:     "Bad path - missing param",
-			method:   http.MethodPost,
-			url:      "/update/gauge/10",
+			method:   http.MethodGet,
 			wantCode: http.StatusNotFound,
 			pathParams: []pathParam{
 				{key: "name", value: ""},
 				{key: "mtype", value: "gauge"},
-				{key: "value", value: "10"},
 			},
 			serviceErrOut: false,
+			wantErr: true,
 		},
 		{
 			name:     "Service returned an error",
-			method:   http.MethodPost,
-			url:      "/update/abc/10",
+			method:   http.MethodGet,
 			wantCode: http.StatusBadRequest,
 			pathParams: []pathParam{
 				{key: "name", value: "abc"},
 				{key: "mtype", value: "gauge"},
-				{key: "value", value: "10"},
 			},
 			serviceErrOut: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSrv := mocksService{wantErr: tt.serviceErrOut}
+			mockSrv := mockservice.MockService{WantErr: tt.serviceErrOut}
 			handler := NewHandler(mockSrv)
 
-			req := httptest.NewRequest(tt.method, tt.url, nil)
+			req := httptest.NewRequest(tt.method, "http://localhost", nil)
 			rr := httptest.NewRecorder()
 			for _, pp := range tt.pathParams {
 				req.SetPathValue(pp.key, pp.value)
 			}
 			handler.ServeHTTP(rr, req)
-			assert.Equal(t, tt.wantCode, rr.Code)
+			if tt.wantErr {
+				assert.Equal(t, tt.wantCode, rr.Code)
+				return
+			}
+
+			val := rr.Body.String()
+			assert.NotEmpty(t, val)
 		})
 	}
 }
