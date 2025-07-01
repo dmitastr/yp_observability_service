@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
@@ -47,10 +48,13 @@ type Agent struct {
 }
 
 func NewAgent(address string) *Agent {
+	if !strings.Contains(address, "http") {
+		address = "http://"+address
+	}
 	agent := Agent{
 		Metrics: make(map[string]metric.Metric), 
 		Client: http.Client{},
-		address: "http://"+address,
+		address: address,
 	}
 	return &agent
 }
