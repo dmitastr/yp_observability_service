@@ -50,7 +50,7 @@ func NewAgent(address string) *Agent {
 	agent := Agent{
 		Metrics: make(map[string]metric.Metric), 
 		Client: http.Client{},
-		address: address,
+		address: "http://"+address,
 	}
 	return &agent
 }
@@ -129,7 +129,9 @@ func (agent *Agent) SendMetric(key string) error {
 	url := fmt.Sprintf(`%s/update/%s/%s/%s`, args...)
 
 	if resp, err := agent.Client.Post(url, "text/plain", nil); err != nil {
-		resp.Body.Close()
+		if resp != nil {
+			resp.Body.Close()
+		}
 		return err
 	}
 	return nil
