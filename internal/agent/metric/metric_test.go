@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
 
 
@@ -17,7 +19,7 @@ func TestGaugeMetric_ToString(t *testing.T) {
 		{
 			name: "valid input",
 			m: NewGaugeMetric("abc", 10.0),
-			want: []string{"abc", "gauge", strconv.FormatFloat(10, 'f', 3, 64)},
+			want: []string{"abc", "gauge", formattools.FormatFloatTrimZero(10.0)},
 		},
 	}
 

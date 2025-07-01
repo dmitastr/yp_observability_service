@@ -3,6 +3,8 @@ package models
 import (
 	"errors"
 	"strconv"
+
+	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
 
 const (
@@ -35,7 +37,7 @@ func (m *Metrics) GetValueString() (val string, err error) {
 	if m.Delta != nil {
 		val = strconv.FormatInt(*m.Delta, 10)
 	} else if m.Value != nil {
-		val = strconv.FormatFloat(*m.Value, 'f', 3, 64)
+		val = formattools.FormatFloatTrimZero(*m.Value)
 	} else {
 		err = errors.New("getting value from empty metric is not allowed")
 	}

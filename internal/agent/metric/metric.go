@@ -3,6 +3,8 @@ package metric
 import (
 	"fmt"
 	"strconv"
+
+	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
 
 type Metric interface {
@@ -36,7 +38,7 @@ func (m *GaugeMetric) UpdateValue(value any) error {
 }
 
 func (m GaugeMetric) GetStringValue() string {
-	return strconv.FormatFloat(m.Value, 'f', 3, 64)
+	return formattools.FormatFloatTrimZero(m.Value)
 }
 
 func (m GaugeMetric) GetValue() any {
