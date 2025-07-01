@@ -17,7 +17,7 @@ func TestGaugeMetric_ToString(t *testing.T) {
 		{
 			name: "valid input",
 			m: NewGaugeMetric("abc", 10.0),
-			want: []string{"abc", "gauge", strconv.FormatFloat(10, 'f', 6, 64)},
+			want: []string{"abc", "gauge", strconv.FormatFloat(10, 'f', 0, 64)},
 		},
 	}
 

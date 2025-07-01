@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"slices"
 
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
@@ -65,6 +66,12 @@ func (storage Storage) toList1() (lst []models.Metrics) {
 	for _, metric := range storage.Metrics {
 		lst = append(lst, metric)
 	}
+	slices.SortFunc(lst, func(a, b models.Metrics) int {
+		if a.ID > b.ID {
+			return 1
+		}
+		return -1
+	})
 	return 
 }
 

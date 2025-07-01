@@ -36,7 +36,7 @@ func (m *GaugeMetric) UpdateValue(value any) error {
 }
 
 func (m GaugeMetric) GetStringValue() string {
-	return strconv.FormatFloat(m.Value, 'f', 6, 64)
+	return strconv.FormatFloat(m.Value, 'f', 0, 64)
 }
 
 func (m GaugeMetric) GetValue() any {

@@ -5,6 +5,7 @@ import (
 
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 )
 
 type MockService struct {
@@ -27,3 +28,13 @@ func (s MockService) GetMetric(name, mType string) (*models.Metrics, error) {
 	}
 	return &m, nil
 }
+
+func (s MockService) GetAll() (lst []entity.DisplayMetric, err error) {
+	m := entity.DisplayMetric{Name: "name", Type: "mType", StringValue: "1"}
+	lst = append(lst, m)
+	if s.WantErr {
+		return lst, errors.New("mock error")
+	}
+	return lst, nil
+}
+

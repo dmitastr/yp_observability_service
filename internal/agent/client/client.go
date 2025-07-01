@@ -107,7 +107,7 @@ func (agent *Agent) Update(pollInterval int) {
 		agent.UpdateMetricValueGauge("StackSys", float64(stats.StackSys))
 		agent.UpdateMetricValueGauge("Sys", float64(stats.Sys))
 		agent.UpdateMetricValueGauge("TotalAlloc", float64(stats.TotalAlloc))
-		agent.UpdateMetricValueGauge("RandomValue", rand.Float64())
+		agent.UpdateMetricValueGauge("RandomValue", 100 * rand.Float64())
 
 		agent.UpdateMetricValueCounter("PollCount", 1)
 
