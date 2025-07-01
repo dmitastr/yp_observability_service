@@ -35,7 +35,7 @@ func (m *Metrics) GetValueString() (val string, err error) {
 	if m.Delta != nil {
 		val = strconv.FormatInt(*m.Delta, 10)
 	} else if m.Value != nil {
-		val = strconv.FormatFloat(*m.Value, 'f', 0, 64)
+		val = strconv.FormatFloat(*m.Value, 'f', 3, 64)
 	} else {
 		err = errors.New("getting value from empty metric is not allowed")
 	}

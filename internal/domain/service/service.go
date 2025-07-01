@@ -58,8 +58,8 @@ func (service Service) GetMetric(name, mType string) (metric *models.Metrics, er
 }
 
 func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
-	metricDb := service.db.GetAll()
-	for _, m := range metricDb {
+	metricDB := service.db.GetAll()
+	for _, m := range metricDB {
 		md := entity.ModelToDisplay(m)
 		metricLst = append(metricLst, md)
 	}
