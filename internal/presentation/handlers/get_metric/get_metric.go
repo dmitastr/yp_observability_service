@@ -1,10 +1,10 @@
 package getmetric
 
 import (
-	"errors"
 	"net/http"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	"github.com/dmitastr/yp_observability_service/internal/errs"
 )
 
 type GetMetricHandler struct {
@@ -25,7 +25,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 	name := req.PathValue("name")
 
 	if mtype == "" || name == "" {
-		http.Error(res, errors.New("no metric name").Error(), http.StatusNotFound)
+		http.Error(res, errs.ErrorWrongPath.Error(), http.StatusNotFound)
 		return
 	}
 

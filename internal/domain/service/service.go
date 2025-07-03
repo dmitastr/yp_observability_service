@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"strconv"
 
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -52,7 +51,7 @@ func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
 func (service Service) GetMetric(name, mType string) (metric *models.Metrics, err error) {
 	metric = service.db.Get(name)
 	if metric == nil {
-		err = errors.New("metric not found")
+		err = errs.ErrorMetricDoesNotExist
 	}
 	return metric, err
 }
@@ -64,7 +63,7 @@ func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
 		metricLst = append(metricLst, md)
 	}
 	if len(metricLst) == 0 {
-		err = errors.New("no metrics added yet")
+		err = errs.ErrorMetricTableEmpty
 	}
 	return metricLst, err
 }
