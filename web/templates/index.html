@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Metrics</title>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 60%;
+                margin: 20px auto;
+            }
+            th, td {
+                border: 1px solid #333;
+                padding: 8px 12px;
+                text-align: left;
+            }
+            th {
+                background-color: #eee;
+            }
+        </style>
+    </head>
+    <body>
+        <h1 style="text-align: center;">Metrics Table</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .}}
+                <tr>
+                    <td>{{.Name}}</td>
+                    <td>{{.StringValue}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </body>
+</html>

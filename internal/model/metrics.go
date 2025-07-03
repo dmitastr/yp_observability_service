@@ -1,5 +1,12 @@
 package models
 
+import (
+	"errors"
+	"strconv"
+
+	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
+)
+
 const (
 	Counter = "counter"
 	Gauge   = "gauge"
@@ -16,4 +23,23 @@ type Metrics struct {
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
 	Hash  string   `json:"hash,omitempty"`
+}
+
+func (m *Metrics) DeltaSet(value *int64) {
+	if m.Delta == nil {
+		m.Delta = value
+		return
+	}
+	*m.Delta += *value
+}
+
+func (m *Metrics) GetValueString() (val string, err error) {
+	if m.Delta != nil {
+		val = strconv.FormatInt(*m.Delta, 10)
+	} else if m.Value != nil {
+		val = formattools.FormatFloatTrimZero(*m.Value)
+	} else {
+		err = errors.New("getting value from empty metric is not allowed")
+	}
+	return val, err
 }
