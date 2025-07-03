@@ -1,15 +1,49 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
+	"github.com/dmitastr/yp_observability_service/internal/errs"
+)
+
+const (
+	Alloc         string = "Alloc"
+	BuckHashSys   string = "BuckHashSys"
+	Frees         string = "Frees"
+	GCCPUFraction string = "GCCPUFraction"
+	GCSys         string = "GCSys"
+	HeapAlloc     string = "HeapAlloc"
+	HeapIdle      string = "HeapIdle"
+	HeapInuse     string = "HeapInuse"
+	HeapObjects   string = "HeapObjects"
+	HeapReleased  string = "HeapReleased"
+	HeapSys       string = "HeapSys"
+	LastGC        string = "LastGC"
+	Lookups       string = "Lookups"
+	MCacheInuse   string = "MCacheInuse"
+	MCacheSys     string = "MCacheSys"
+	MSpanInuse    string = "MSpanInuse"
+	MSpanSys      string = "MSpanSys"
+	Mallocs       string = "Mallocs"
+	NextGC        string = "NextGC"
+	NumForcedGC   string = "NumForcedGC"
+	NumGC         string = "NumGC"
+	OtherSys      string = "OtherSys"
+	PauseTotalNs  string = "PauseTotalNs"
+	StackInuse    string = "StackInuse"
+	StackSys      string = "StackSys"
+	Sys           string = "Sys"
+	TotalAlloc    string = "TotalAlloc"
+
+	RandomValue string = "RandomValue"
+	PollCount   string = "PollCount"
 )
 
 // Alloc
@@ -40,7 +74,6 @@ import (
 // Sys
 // TotalAlloc
 
-
 type Agent struct {
 	Metrics map[string]metric.Metric
 	Client  http.Client
@@ -49,11 +82,11 @@ type Agent struct {
 
 func NewAgent(address string) *Agent {
 	if !strings.Contains(address, "http") {
-		address = "http://"+address
+		address = "http://" + address
 	}
 	agent := Agent{
-		Metrics: make(map[string]metric.Metric), 
-		Client: http.Client{},
+		Metrics: make(map[string]metric.Metric),
+		Client:  http.Client{},
 		address: address,
 	}
 	return &agent
@@ -84,36 +117,36 @@ func (agent *Agent) Update(pollInterval int) {
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
 
-		agent.UpdateMetricValueGauge("Alloc", float64(stats.Alloc))
-		agent.UpdateMetricValueGauge("BuckHashSys", float64(stats.BuckHashSys))
-		agent.UpdateMetricValueGauge("Frees", float64(stats.Frees))
-		agent.UpdateMetricValueGauge("GCCPUFraction", float64(stats.GCCPUFraction))
-		agent.UpdateMetricValueGauge("GCSys", float64(stats.GCSys))
-		agent.UpdateMetricValueGauge("HeapAlloc", float64(stats.HeapAlloc))
-		agent.UpdateMetricValueGauge("HeapIdle", float64(stats.HeapIdle))
-		agent.UpdateMetricValueGauge("HeapInuse", float64(stats.HeapInuse))
-		agent.UpdateMetricValueGauge("HeapObjects", float64(stats.HeapObjects))
-		agent.UpdateMetricValueGauge("HeapReleased", float64(stats.HeapReleased))
-		agent.UpdateMetricValueGauge("HeapSys", float64(stats.HeapSys))
-		agent.UpdateMetricValueGauge("LastGC", float64(stats.LastGC))
-		agent.UpdateMetricValueGauge("Lookups", float64(stats.Lookups))
-		agent.UpdateMetricValueGauge("MCacheInuse", float64(stats.MCacheInuse))
-		agent.UpdateMetricValueGauge("MCacheSys", float64(stats.MCacheSys))
-		agent.UpdateMetricValueGauge("MSpanInuse", float64(stats.MSpanInuse))
-		agent.UpdateMetricValueGauge("MSpanSys", float64(stats.MSpanSys))
-		agent.UpdateMetricValueGauge("Mallocs", float64(stats.Mallocs))
-		agent.UpdateMetricValueGauge("NextGC", float64(stats.NextGC))
-		agent.UpdateMetricValueGauge("NumForcedGC", float64(stats.NumForcedGC))
-		agent.UpdateMetricValueGauge("NumGC", float64(stats.NumGC))
-		agent.UpdateMetricValueGauge("OtherSys", float64(stats.OtherSys))
-		agent.UpdateMetricValueGauge("PauseTotalNs", float64(stats.PauseTotalNs))
-		agent.UpdateMetricValueGauge("StackInuse", float64(stats.StackInuse))
-		agent.UpdateMetricValueGauge("StackSys", float64(stats.StackSys))
-		agent.UpdateMetricValueGauge("Sys", float64(stats.Sys))
-		agent.UpdateMetricValueGauge("TotalAlloc", float64(stats.TotalAlloc))
-		agent.UpdateMetricValueGauge("RandomValue", 100 * rand.Float64())
+		agent.UpdateMetricValueGauge(Alloc, float64(stats.Alloc))
+		agent.UpdateMetricValueGauge(BuckHashSys, float64(stats.BuckHashSys))
+		agent.UpdateMetricValueGauge(Frees, float64(stats.Frees))
+		agent.UpdateMetricValueGauge(GCCPUFraction, float64(stats.GCCPUFraction))
+		agent.UpdateMetricValueGauge(GCSys, float64(stats.GCSys))
+		agent.UpdateMetricValueGauge(HeapAlloc, float64(stats.HeapAlloc))
+		agent.UpdateMetricValueGauge(HeapIdle, float64(stats.HeapIdle))
+		agent.UpdateMetricValueGauge(HeapInuse, float64(stats.HeapInuse))
+		agent.UpdateMetricValueGauge(HeapObjects, float64(stats.HeapObjects))
+		agent.UpdateMetricValueGauge(HeapReleased, float64(stats.HeapReleased))
+		agent.UpdateMetricValueGauge(HeapSys, float64(stats.HeapSys))
+		agent.UpdateMetricValueGauge(LastGC, float64(stats.LastGC))
+		agent.UpdateMetricValueGauge(Lookups, float64(stats.Lookups))
+		agent.UpdateMetricValueGauge(MCacheInuse, float64(stats.MCacheInuse))
+		agent.UpdateMetricValueGauge(MCacheSys, float64(stats.MCacheSys))
+		agent.UpdateMetricValueGauge(MSpanInuse, float64(stats.MSpanInuse))
+		agent.UpdateMetricValueGauge(MSpanSys, float64(stats.MSpanSys))
+		agent.UpdateMetricValueGauge(Mallocs, float64(stats.Mallocs))
+		agent.UpdateMetricValueGauge(NextGC, float64(stats.NextGC))
+		agent.UpdateMetricValueGauge(NumForcedGC, float64(stats.NumForcedGC))
+		agent.UpdateMetricValueGauge(NumGC, float64(stats.NumGC))
+		agent.UpdateMetricValueGauge(OtherSys, float64(stats.OtherSys))
+		agent.UpdateMetricValueGauge(PauseTotalNs, float64(stats.PauseTotalNs))
+		agent.UpdateMetricValueGauge(StackInuse, float64(stats.StackInuse))
+		agent.UpdateMetricValueGauge(StackSys, float64(stats.StackSys))
+		agent.UpdateMetricValueGauge(Sys, float64(stats.Sys))
+		agent.UpdateMetricValueGauge(TotalAlloc, float64(stats.TotalAlloc))
+		agent.UpdateMetricValueGauge(RandomValue, 100*rand.Float64())
 
-		agent.UpdateMetricValueCounter("PollCount", 1)
+		agent.UpdateMetricValueCounter(PollCount, 1)
 
 	}
 }
@@ -121,18 +154,18 @@ func (agent *Agent) Update(pollInterval int) {
 func (agent *Agent) SendMetric(key string) error {
 	metric, ok := agent.Metrics[key]
 	if !ok {
-		return errors.New("metric was not found")
+		return errs.ErrorMetricDoesNotExist
 	}
-	pathParams := metric.ToString()
+	pathSuffix := metric.ToString()
+	pathParams := []string{"update"}
+	pathParams = append(pathParams, pathSuffix[:]...)
 
-	args := make([]any, len(pathParams)+1)
-	args[0] = agent.address
-	for i := range len(pathParams) {
-		args[i+1] = pathParams[i]
+	postPath, err := url.JoinPath(agent.address, pathParams...)
+	if err != nil {
+		return errs.ErrorWrongPath
 	}
-	url := fmt.Sprintf(`%s/update/%s/%s/%s`, args...)
 
-	if resp, err := agent.Client.Post(url, "text/plain", nil); err != nil {
+	if resp, err := agent.Client.Post(postPath, "text/plain", nil); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
