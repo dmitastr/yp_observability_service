@@ -3,22 +3,21 @@ package database
 import (
 	"fmt"
 	"slices"
+	"sync"
 
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
 
-
 type MetricEntity struct {
-	ID string
-	MType string
-	GaugeValue float64
+	ID           string
+	MType        string
+	GaugeValue   float64
 	CounterValue int64
 }
 
-
 func ModelToEntity(metric models.Metrics) MetricEntity {
 	entity := MetricEntity{
-		ID: metric.ID, 
+		ID:    metric.ID,
 		MType: metric.MType,
 	}
 	if metric.Value != nil {
@@ -32,6 +31,7 @@ func ModelToEntity(metric models.Metrics) MetricEntity {
 }
 
 type Storage struct {
+	sync.Mutex
 	Metrics map[string]models.Metrics
 }
 
@@ -41,6 +41,9 @@ func NewStorage() *Storage {
 }
 
 func (storage *Storage) Update(newMetric models.Metrics) {
+	fmt.Println("Get new metric value", newMetric)
+	storage.Lock()
+	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
 		if metric.Delta != nil {
 			newMetric.DeltaSet(metric.Delta)
@@ -50,37 +53,9 @@ func (storage *Storage) Update(newMetric models.Metrics) {
 	fmt.Println(storage.toList())
 }
 
-
-
-
-func (storage Storage) toList() (lst []MetricEntity) {
-	for _, metric := range storage.Metrics {
-		m := ModelToEntity(metric)
-		lst = append(lst, m)
-	}
-	return 
-}
-
-
-func (storage Storage) toList1() (lst []models.Metrics) {
-	for _, metric := range storage.Metrics {
-		lst = append(lst, metric)
-	}
-	slices.SortFunc(lst, func(a, b models.Metrics) int {
-		if a.ID > b.ID {
-			return 1
-		}
-		return -1
-	})
-	return 
-}
-
-
 func (storage *Storage) GetAll() []models.Metrics {
-	return storage.toList1()
+	return storage.toList()
 }
-
-
 
 func (storage *Storage) Get(key string) *models.Metrics {
 	if metric, ok := storage.Metrics[key]; ok {
@@ -91,3 +66,15 @@ func (storage *Storage) Get(key string) *models.Metrics {
 	return nil
 }
 
+func (storage *Storage) toList() (lst []models.Metrics) {
+	for _, metric := range storage.Metrics {
+		lst = append(lst, metric)
+	}
+	slices.SortFunc(lst, func(a, b models.Metrics) int {
+		if a.ID > b.ID {
+			return 1
+		}
+		return -1
+	})
+	return
+}

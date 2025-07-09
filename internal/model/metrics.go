@@ -1,9 +1,10 @@
 package models
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 
+	"github.com/dmitastr/yp_observability_service/internal/errs"
 	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
 
@@ -37,9 +38,10 @@ func (m *Metrics) GetValueString() (val string, err error) {
 	if m.Delta != nil {
 		val = strconv.FormatInt(*m.Delta, 10)
 	} else if m.Value != nil {
+		fmt.Printf("Raw value=%f\n", *m.Value)
 		val = formattools.FormatFloatTrimZero(*m.Value)
 	} else {
-		err = errors.New("getting value from empty metric is not allowed")
+		err = errs.ErrorValueFromEmptyMetric
 	}
 	return val, err
 }
