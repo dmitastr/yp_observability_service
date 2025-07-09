@@ -3,18 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v6"
 	"net/http"
 
+	"github.com/caarlos0/env/v6"
+
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
-type Config struct {
-	Address        string `env:"ADDRESS"`
-}
 
 var serverAddress string
-var cfg Config
+var cfg common.Config
 
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "set server host and port")
@@ -23,8 +22,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	if cfg.Address == "" {
-		cfg.Address = serverAddress
+	if cfg.Address == nil {
+		cfg.Address = &serverAddress
 	}
 
 }
@@ -34,8 +33,8 @@ func main() {
 
 	router := server.NewServer()
 
-	fmt.Printf("Starting server=%s\n", cfg.Address)
-	if err := http.ListenAndServe(cfg.Address, router); err != nil {
+	fmt.Printf("Starting server=%s\n", *cfg.Address)
+	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 		panic(err)
 	}
 }
