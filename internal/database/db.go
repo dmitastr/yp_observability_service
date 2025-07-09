@@ -31,7 +31,7 @@ func ModelToEntity(metric models.Metrics) MetricEntity {
 }
 
 type Storage struct {
-	mu      sync.Mutex
+	sync.Mutex
 	Metrics map[string]models.Metrics
 }
 
@@ -41,8 +41,9 @@ func NewStorage() *Storage {
 }
 
 func (storage *Storage) Update(newMetric models.Metrics) {
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
+	fmt.Println("Get new metric value", newMetric)
+	storage.Lock()
+	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
 		if metric.Delta != nil {
 			newMetric.DeltaSet(metric.Delta)
@@ -66,9 +67,6 @@ func (storage *Storage) Get(key string) *models.Metrics {
 }
 
 func (storage *Storage) toList() (lst []models.Metrics) {
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
-
 	for _, metric := range storage.Metrics {
 		lst = append(lst, metric)
 	}
