@@ -3,16 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"strconv"
-
+	"github.com/caarlos0/env/v6"
+	
 	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	"github.com/dmitastr/yp_observability_service/internal/common"
 )
 
 
 var serverAddress string
 var reportInterval int
 var pollInterval int
+var cfg common.Config
 
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "set server host and port")
@@ -21,22 +22,18 @@ func init() {
 }
 
 func configParse() {
-	if val, ok := os.LookupEnv("ADDRESS"); ok {
-		serverAddress = val
+	err := env.Parse(&cfg)
+	if err != nil {
+		panic(err)
 	}
-	if val, ok := os.LookupEnv("POLL_INTERVAL"); ok {
-		parsedVal, err := strconv.Atoi(val)
-		if err != nil {
-			panic(err)
-		}
-		pollInterval = parsedVal
+	if cfg.Address == nil {
+		cfg.Address = &serverAddress
 	}
-	if val, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
-		parsedVal, err := strconv.Atoi(val)
-		if err != nil {
-			panic(err)
-		}
-		reportInterval = parsedVal
+	if cfg.ReportInterval == nil {
+		cfg.ReportInterval = &reportInterval
+	}
+	if cfg.PollInterval == nil {
+		cfg.PollInterval = &pollInterval
 	}
 }
 
@@ -44,8 +41,8 @@ func main() {
 	flag.Parse()
 	configParse()
 
-	fmt.Printf("Starting client for server=%s, poll interval=%d, report interval=%d\n", serverAddress, pollInterval, reportInterval)
+	fmt.Printf("Starting client for server=%s, poll interval=%d, report interval=%d\n", *cfg.Address, *cfg.PollInterval, *cfg.ReportInterval)
 
-	agent := client.NewAgent(serverAddress)
-	agent.Run(pollInterval, reportInterval)
+	agent := client.NewAgent(*cfg.Address)
+	agent.Run(*cfg.PollInterval, *cfg.ReportInterval)
 }
