@@ -28,6 +28,12 @@ func TestFormatFloatTrimZero(t *testing.T) {
 			arg: 10.10000001,
 			want: "10.10000001",
 		},
+		
+		{
+			name: "No decimal point",
+			arg: 10,
+			want: "10",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
