@@ -6,7 +6,7 @@ type Config struct {
 	Address *string `env:"ADDRESS"`
 }
 
-func New(address string) (cfg *Config) {
+func New(address string) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
 		panic(err)

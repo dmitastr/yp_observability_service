@@ -8,7 +8,7 @@ type Config struct {
 	ReportInterval *int    `env:"REPORT_INTERVAL"`
 }
 
-func New(address string, pollInterval int, reportInterval int) (cfg *Config) {
+func New(address string, pollInterval int, reportInterval int) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
 		panic(err)
