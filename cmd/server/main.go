@@ -2,10 +2,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net/http"
 
 	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/env_config"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
@@ -18,11 +18,13 @@ func init() {
 
 func main() {
 	flag.Parse()
+	logger.Initialize()
 	cfg := envconfig.New(serverAddress)
 
 	router := server.NewServer()
 
-	fmt.Printf("Starting server=%s\n", *cfg.Address)
+
+	logger.GetLogger().Infof("Starting server=%s\n", *cfg.Address)
 	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 		panic(err)
 	}

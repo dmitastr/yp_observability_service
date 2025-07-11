@@ -1,6 +1,5 @@
 package server
 
-
 import (
 	"github.com/go-chi/chi/v5"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
+	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 
 func NewServer() *chi.Mux {
@@ -20,6 +20,7 @@ func NewServer() *chi.Mux {
 
 	router := chi.NewRouter()
 
+	router.Use(requestlogger.RequestLogger)
 	router.Get(`/`, listMetricsHandler.ServeHTTP)
 	router.Post(`/update/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
 	router.Get(`/value/{mtype}/{name}`, getMetricHandler.ServeHTTP)

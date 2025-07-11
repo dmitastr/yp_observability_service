@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
 const (
@@ -180,7 +180,7 @@ func (agent *Agent) SendData(reportInterval int) {
 	for range ticker.C {
 		for ID := range agent.Metrics {
 			if err := agent.SendMetric(ID); err != nil {
-				fmt.Println(err)
+				logger.GetLogger().Error(err)
 			}
 		}
 	}
