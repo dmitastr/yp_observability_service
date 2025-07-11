@@ -3,17 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v6"
 	
 	"github.com/dmitastr/yp_observability_service/internal/agent/client"
-	"github.com/dmitastr/yp_observability_service/internal/common"
+	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/env_config"
 )
 
 
 var serverAddress string
 var reportInterval int
 var pollInterval int
-var cfg common.Config
 
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "set server host and port")
@@ -21,25 +19,9 @@ func init() {
 	flag.IntVar(&pollInterval, "p", 2, "frequency of metric polling from source in seconds")
 }
 
-func configParse() {
-	err := env.Parse(&cfg)
-	if err != nil {
-		panic(err)
-	}
-	if cfg.Address == nil {
-		cfg.Address = &serverAddress
-	}
-	if cfg.ReportInterval == nil {
-		cfg.ReportInterval = &reportInterval
-	}
-	if cfg.PollInterval == nil {
-		cfg.PollInterval = &pollInterval
-	}
-}
-
 func main() {
 	flag.Parse()
-	configParse()
+	cfg := envconfig.New(serverAddress, pollInterval, reportInterval)
 
 	fmt.Printf("Starting client for server=%s, poll interval=%d, report interval=%d\n", *cfg.Address, *cfg.PollInterval, *cfg.ReportInterval)
 

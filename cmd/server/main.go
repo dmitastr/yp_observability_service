@@ -5,31 +5,20 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/caarlos0/env/v6"
-
-	"github.com/dmitastr/yp_observability_service/internal/common"
+	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/env_config"
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
 
 var serverAddress string
-var cfg common.Config
 
 func init() {
 	flag.StringVar(&serverAddress, "a", "localhost:8080", "set server host and port")
-
-	err := env.Parse(&cfg)
-	if err != nil {
-		panic(err)
-	}
-	if cfg.Address == nil {
-		cfg.Address = &serverAddress
-	}
-
 }
 
 func main() {
 	flag.Parse()
+	cfg := envconfig.New(serverAddress)
 
 	router := server.NewServer()
 
