@@ -21,7 +21,6 @@ func Initialize() {
 func GetLogger() *zap.SugaredLogger {
 	if SLog == nil {
 		Initialize()
-		return SLog
 	}
 	return SLog
 }
