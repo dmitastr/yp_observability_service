@@ -24,7 +24,7 @@ func main() {
 	logger.Initialize()
 	cfg := envconfig.New(serverAddress, pollInterval, reportInterval)
 
-	logger.GetLogger().Infow("Starting client for server=%s, poll interval=%d, report interval=%d", 
+	logger.GetLogger().Infof("Starting client for server=%s, poll interval=%d, report interval=%d", 
 		*cfg.Address, 
 		*cfg.PollInterval, 
 		*cfg.ReportInterval,
