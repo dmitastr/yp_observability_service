@@ -1,11 +1,12 @@
 package service
 
 import (
-	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	"github.com/dmitastr/yp_observability_service/internal/repository"
@@ -26,7 +27,7 @@ func NewService(db repository.Database) *Service {
 }
 
 func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
-	fmt.Println("Processing update", upd)
+	logger.GetLogger().Infof("Processing update: %s", upd)
 	metric := models.Metrics{ID: upd.MetricName, MType: upd.MType}
 
 	switch upd.MType {
@@ -67,5 +68,11 @@ func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
 	if len(metricLst) == 0 {
 		err = errs.ErrorMetricTableEmpty
 	}
+	slices.SortFunc(metricLst, func(a, b entity.DisplayMetric) int {
+		if a.Name > b.Name {
+			return 1
+		}
+		return -1
+	})
 	return metricLst, err
 }

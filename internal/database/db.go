@@ -1,10 +1,9 @@
 package database
 
 import (
-	"fmt"
-	"slices"
 	"sync"
 
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
 
@@ -41,7 +40,7 @@ func NewStorage() *Storage {
 }
 
 func (storage *Storage) Update(newMetric models.Metrics) {
-	fmt.Println("Get new metric value", newMetric)
+	logger.GetLogger().Infof("Get new data: %s", &newMetric)
 	storage.Lock()
 	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
@@ -50,31 +49,20 @@ func (storage *Storage) Update(newMetric models.Metrics) {
 		}
 	}
 	storage.Metrics[newMetric.ID] = newMetric
-	fmt.Println(storage.toList())
 }
 
-func (storage *Storage) GetAll() []models.Metrics {
-	return storage.toList()
+func (storage *Storage) GetAll() (lst []models.Metrics) {
+	for _, metric := range storage.Metrics {
+		lst = append(lst, metric)
+	}
+
+	return
 }
 
 func (storage *Storage) Get(key string) *models.Metrics {
 	if metric, ok := storage.Metrics[key]; ok {
-		val, _ := metric.GetValueString()
-		fmt.Printf("Found metric: name=%s, value=%s\n", metric.ID, val)
+		logger.GetLogger().Infof("Found metric: %s", metric)
 		return &metric
 	}
 	return nil
-}
-
-func (storage *Storage) toList() (lst []models.Metrics) {
-	for _, metric := range storage.Metrics {
-		lst = append(lst, metric)
-	}
-	slices.SortFunc(lst, func(a, b models.Metrics) int {
-		if a.ID > b.ID {
-			return 1
-		}
-		return -1
-	})
-	return
 }
