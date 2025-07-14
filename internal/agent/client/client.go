@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -45,34 +47,6 @@ const (
 	RandomValue string = "RandomValue"
 	PollCount   string = "PollCount"
 )
-
-// Alloc
-// BuckHashSys
-// Frees
-// GCCPUFraction
-// GCSys
-// HeapAlloc
-// HeapIdle
-// HeapInuse
-// HeapObjects
-// HeapReleased
-// HeapSys
-// LastGC
-// Lookups
-// MCacheInuse
-// MCacheSys
-// MSpanInuse
-// MSpanSys
-// Mallocs
-// NextGC
-// NumForcedGC
-// NumGC
-// OtherSys
-// PauseTotalNs
-// StackInuse
-// StackSys
-// Sys
-// TotalAlloc
 
 type Agent struct {
 	Metrics map[string]metric.Metric
@@ -156,16 +130,23 @@ func (agent *Agent) SendMetric(key string) error {
 	if !ok {
 		return errs.ErrorMetricDoesNotExist
 	}
-	pathSuffix := metric.ToString()
+
+	data, err := json.Marshal(metric)
+	if err != nil {
+		return err
+	}
+
+	// pathSuffix := metric.ToString()
 	pathParams := []string{"update"}
-	pathParams = append(pathParams, pathSuffix[:]...)
+	// pathParams = append(pathParams, pathSuffix[:]...)
 
 	postPath, err := url.JoinPath(agent.address, pathParams...)
 	if err != nil {
 		return errs.ErrorWrongPath
 	}
 
-	if resp, err := agent.Client.Post(postPath, "text/plain", nil); err != nil {
+
+	if resp, err := agent.Client.Post(postPath, "application/json", bytes.NewBuffer(data)); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
