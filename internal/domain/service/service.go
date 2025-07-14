@@ -25,8 +25,8 @@ func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
 	return nil	
 }
 
-func (service Service) GetMetric(name, mType string) (metric *models.Metrics, err error) {
-	metric = service.db.Get(name)
+func (service Service) GetMetric(upd update.MetricUpdate) (metric *models.Metrics, err error) {
+	metric = service.db.Get(upd.MetricName)
 	if metric == nil {
 		err = errs.ErrorMetricDoesNotExist
 	}
