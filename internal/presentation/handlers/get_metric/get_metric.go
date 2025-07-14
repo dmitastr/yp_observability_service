@@ -32,7 +32,6 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 			return	
 		}
 		upd.MetricValue = "1"
-		res.Header().Add("Content-Type", "application/json")
 	default:
 		res.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -50,12 +49,28 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		http.Error(res, err.Error(), http.StatusNotFound)
 		return
 	}
-	valString, err := metric.GetValueString()
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+
+	switch req.Method {
+	case http.MethodGet:
+		valString, err := metric.GetValueString()
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusOK)
+		res.Write([]byte(valString))
+		return
+		
+	case http.MethodPost:
+		if err := json.NewEncoder(res).Encode(&metric); err != nil {
+			http.Error(res, err.Error(), http.StatusNotFound)
+			return	
+		}
+		res.Header().Add("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
+	default:
+		res.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	res.WriteHeader(http.StatusOK)
-	res.Write([]byte(valString))
 
 }
