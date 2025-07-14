@@ -22,7 +22,12 @@ func NewServer() *chi.Mux {
 
 	router.Use(requestlogger.RequestLogger)
 	router.Get(`/`, listMetricsHandler.ServeHTTP)
-	router.Post(`/update/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
+	router.Route(`/update`, func(r chi.Router) {
+		r.Post(`/`, metricHandler.ServeHTTP)
+		r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
+	})
+	// router.Post(`/update`, metricHandler.ServeHTTP)
+	// router.Post(`/update/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
 	router.Get(`/value/{mtype}/{name}`, getMetricHandler.ServeHTTP)
 	return router
 }

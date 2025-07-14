@@ -7,6 +7,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
 const (
@@ -24,7 +25,15 @@ type Metrics struct {
 	MType string   `json:"type"`
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
-	Hash  string   `json:"hash,omitempty"`
+	Hash  string   `json:"-"`
+}
+
+func FromUpdate(upd update.MetricUpdate) (m Metrics) {
+	m.Delta = upd.Delta
+	m.Value = upd.Value
+	m.ID = upd.MetricName
+	m.MType = upd.MType
+	return
 }
 
 func (m *Metrics) DeltaSet(value *int64) {

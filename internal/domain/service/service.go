@@ -1,19 +1,12 @@
 package service
 
 import (
-	"strconv"
-
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	"github.com/dmitastr/yp_observability_service/internal/repository"
-)
-
-const (
-	GAUGE   = "gauge"
-	COUNTER = "counter"
 )
 
 
@@ -27,28 +20,10 @@ func NewService(db repository.Database) *Service {
 
 func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
 	logger.GetLogger().Infof("Processing update: %s", upd)
-	metric := models.Metrics{ID: upd.MetricName, MType: upd.MType}
-
-	switch upd.MType {
-	case GAUGE:
-		meticValue, err := strconv.ParseFloat(upd.MetricValue, 64)
-		if err != nil {
-			return err
-		}
-		metric.Value = &meticValue
-	case COUNTER:
-		meticValue, err := strconv.ParseInt(upd.MetricValue, 10, 64)
-		if err != nil {
-			return err
-		}
-		metric.Delta = &meticValue
-	default:
-		return errs.ErrorWrongUpdateType
-	}
+	metric := models.FromUpdate(upd)
 	service.db.Update(metric)
 	return nil	
 }
-
 
 func (service Service) GetMetric(name, mType string) (metric *models.Metrics, err error) {
 	metric = service.db.Get(name)
