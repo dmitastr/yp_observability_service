@@ -32,6 +32,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 			return	
 		}
 		upd.MetricValue = "1"
+		res.Header().Add("Content-Type", "application/json")
 	default:
 		res.WriteHeader(http.StatusMethodNotAllowed)
 		return

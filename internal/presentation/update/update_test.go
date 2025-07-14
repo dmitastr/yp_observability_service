@@ -9,7 +9,7 @@ import (
 func TestNew(t *testing.T) {
 	var (
 		delta int64 = 10
-		value float64 = 99.9
+		value       = 99.9
 	)
 	type args struct {
 		name  string
@@ -23,25 +23,25 @@ func TestNew(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "update with counter",
-			args: args{name: "abc", mtype: "counter", value: "10"},
-			want: MetricUpdate{MType: "counter", MetricName: "abc", MetricValue: "10", Delta: &delta},
+			name:    "update with counter",
+			args:    args{name: "abc", mtype: "counter", value: "10"},
+			want:    MetricUpdate{MType: "counter", MetricName: "abc", MetricValue: "10", Delta: &delta},
 			wantErr: false,
 		},
 		{
-			name: "update with gauge",
-			args: args{name: "abc", mtype: "gauge", value: "99.9"},
-			want: MetricUpdate{MType: "gauge", MetricName: "abc", MetricValue: "99.9", Value: &value},
+			name:    "update with gauge",
+			args:    args{name: "abc", mtype: "gauge", value: "99.9"},
+			want:    MetricUpdate{MType: "gauge", MetricName: "abc", MetricValue: "99.9", Value: &value},
 			wantErr: false,
 		},
 		{
-			name: "gauge wrong value",
-			args: args{name: "abc", mtype: "gauge", value: "abc"},
+			name:    "gauge wrong value",
+			args:    args{name: "abc", mtype: "gauge", value: "abc"},
 			wantErr: true,
 		},
 		{
-			name: "counter wrong value",
-			args: args{name: "abc", mtype: "counter", value: "abc"},
+			name:    "counter wrong value",
+			args:    args{name: "abc", mtype: "counter", value: "abc"},
 			wantErr: true,
 		},
 	}
