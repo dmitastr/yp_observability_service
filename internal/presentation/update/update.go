@@ -1,6 +1,7 @@
 package update
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -23,11 +24,11 @@ func New(name, mtype, valueStr string) (metric MetricUpdate, err error) {
 	metric.MetricName = name
 	metric.MType = mtype
 	metric.MetricValue = valueStr
-	
+
 	if !metric.IsValid() {
 		return
 	}
-	
+
 	switch mtype {
 	case GAUGE:
 		meticValue, err := strconv.ParseFloat(valueStr, 64)
@@ -54,4 +55,8 @@ func (upd MetricUpdate) IsValid() bool {
 
 func (upd MetricUpdate) IsEmpty() bool {
 	return upd.MetricName == "" && upd.MType == "" && upd.MetricValue == ""
+}
+
+func (upd MetricUpdate) String() string {
+	return fmt.Sprintf(`update: name=%s, mtype=%s, value=%s`, upd.MetricName, upd.MType, upd.MetricValue)
 }
