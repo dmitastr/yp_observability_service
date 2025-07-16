@@ -8,6 +8,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 
@@ -20,7 +21,13 @@ func NewServer() *chi.Mux {
 
 	router := chi.NewRouter()
 
-	router.Use(requestlogger.RequestLogger)
+	// middleware
+	router.Use(
+		requestlogger.RequestLogger, 
+		compress.CompressMiddleware,
+	)
+
+	// setting routes
 	router.Get(`/`, listMetricsHandler.ServeHTTP)
 	
 	router.Route(`/update`, func(r chi.Router) {

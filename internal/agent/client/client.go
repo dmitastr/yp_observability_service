@@ -2,7 +2,9 @@ package client
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -123,6 +125,28 @@ func (agent *Agent) Update(pollInterval int) {
 		agent.UpdateMetricValueCounter(PollCount, 1)
 
 	}
+}
+
+func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
+	var postData io.Reader = bytes.NewBuffer(data)
+	compression := ""
+	
+	if compressed {
+		postData, err = gzip.NewReader(postData)
+		if err != nil {
+			return nil, err
+		}
+		compression = ""
+	}
+	
+	req, err := http.NewRequest(http.MethodPost, url, postData)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Content-Encoding", compression)
+	resp, err = agent.Client.Do(req)
+	return 
 }
 
 func (agent *Agent) SendMetric(key string) error {

@@ -59,6 +59,7 @@ func (m *Metrics) String() string {
 	strVal, err := m.GetValueString()
 	if err != nil {
 		logger.GetLogger().Error(err)
+		return ""
 	}
 	return fmt.Sprintf("name=%s, type=%s, value=%s", m.ID, m.MType, strVal)
 }

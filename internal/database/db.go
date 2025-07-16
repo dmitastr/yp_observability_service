@@ -41,7 +41,7 @@ func NewStorage() *Storage {
 }
 
 func (storage *Storage) Update(newMetric models.Metrics) {
-	logger.GetLogger().Infof("Get new data: %s", newMetric)
+	logger.GetLogger().Infof("Get new data: %s", newMetric.String())
 	storage.Lock()
 	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
