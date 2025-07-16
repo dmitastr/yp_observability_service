@@ -63,11 +63,11 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		
 	case http.MethodPost:
 		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(res).Encode(&metric); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
 			return	
 		}
-		res.WriteHeader(http.StatusOK)
 		return
 	default:
 		res.WriteHeader(http.StatusMethodNotAllowed)

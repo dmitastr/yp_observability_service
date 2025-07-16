@@ -35,8 +35,8 @@ func (rww LoggingResponseWriter) Header() http.Header {
 }
 
 func (rww LoggingResponseWriter) WriteHeader(statusCode int) {
-	rww.w.WriteHeader(statusCode)
 	rww.ResponseData.StatusCode = statusCode
+	rww.w.WriteHeader(statusCode)
 }
 
 
