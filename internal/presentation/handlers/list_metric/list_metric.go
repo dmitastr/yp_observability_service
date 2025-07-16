@@ -25,6 +25,7 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 		res.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	res.Header().Set("Content-Type", "text/html")
 
 	metrics, err := handler.service.GetAll()
 	if err != nil {
