@@ -9,11 +9,12 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
+	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/env_config"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 
-func NewServer() *chi.Mux {
-	storage := db.NewStorage()
+func NewServer(cfg envconfig.Config) *chi.Mux {
+	storage := db.NewStorage(*cfg.FileStoragePath, *cfg.StoreInterval, *cfg.Restore)
 	service := service.NewService(storage)
 	metricHandler := updatemetric.NewHandler(service)
 	getMetricHandler := getmetric.NewHandler(service)

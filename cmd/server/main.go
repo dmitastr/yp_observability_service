@@ -10,18 +10,24 @@ import (
 )
 
 
-var serverAddress string
+var ServerAddress string
+var StoreInterval int
+var Restore bool
+var FileStoragePath string
 
 func init() {
-	flag.StringVar(&serverAddress, "a", "localhost:8080", "set server host and port")
+	flag.StringVar(&ServerAddress, "a", "localhost:8080", "set server host and port")
+	flag.IntVar(&StoreInterval, "i", 300, "interval for storing data to the file in seconds, 0=stream writing")
+	flag.BoolVar(&Restore, "r", false, "restore data from file")
+	flag.StringVar(&FileStoragePath, "f", "./data/data.json", "path for writing data")
 }
 
 func main() {
 	flag.Parse()
 	logger.Initialize()
-	cfg := envconfig.New(serverAddress)
+	cfg := envconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore)
 
-	router := server.NewServer()
+	router := server.NewServer(cfg)
 
 
 	logger.GetLogger().Infof("Starting server=%s\n", *cfg.Address)

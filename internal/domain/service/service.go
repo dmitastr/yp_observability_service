@@ -1,6 +1,8 @@
 package service
 
 import (
+	"slices"
+
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
@@ -42,5 +44,11 @@ func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
 	if len(metricLst) == 0 {
 		err = errs.ErrorMetricTableEmpty
 	}
+	slices.SortFunc(metricLst, func(a, b entity.DisplayMetric) int {
+		if a.Name > b.Name {
+			return 1
+		}
+		return -1
+	})
 	return metricLst, err
 }

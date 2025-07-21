@@ -1,7 +1,8 @@
 package database
 
 import (
-	"slices"
+	"encoding/json"
+	"os"
 	"sync"
 
 	"github.com/dmitastr/yp_observability_service/internal/logger"
@@ -33,11 +34,69 @@ func ModelToEntity(metric models.Metrics) MetricEntity {
 type Storage struct {
 	sync.Mutex
 	Metrics map[string]models.Metrics
+	FileName    string
+	StreamWrite bool
 }
 
-func NewStorage() *Storage {
-	s := Storage{Metrics: make(map[string]models.Metrics)}
-	return &s
+func NewStorage(fname string, storeInterval int, restore bool) *Storage {
+	storage := Storage{FileName: fname, Metrics: make(map[string]models.Metrics)}
+	if storeInterval == 0 {
+		storage.StreamWrite = true
+	}
+
+	if restore {
+		err := storage.Load()
+		if err != nil {
+			logger.GetLogger().Fatal(err)
+		}
+	}
+
+	return &storage
+}
+
+func (storage *Storage) CreateFile() *os.File {
+	file, err := os.Create(storage.FileName)
+	if err != nil {
+		logger.GetLogger().Panicf("error while opening file '%s': %s", storage.FileName, err)
+	}
+	return file
+}
+
+func (storage *Storage) OpenFile() *os.File {
+	file, err := os.Open(storage.FileName)
+	if err != nil {
+		logger.GetLogger().Panicf("error while opening file '%s': %s", storage.FileName, err)
+	}
+	return file
+}
+
+func (storage *Storage) Flush() error {
+	file := storage.CreateFile()
+	if err := json.NewEncoder(file).Encode(storage.toList()); err != nil {
+		logger.GetLogger().Error(err)
+		return err
+	}
+	return nil
+}
+
+func (storage *Storage) Load() error {
+	file := storage.OpenFile()
+
+	metrics := make([]models.Metrics, 0)
+	if err := json.NewDecoder(file).Decode(&metrics); err != nil {
+		logger.GetLogger().Fatal(err)
+		return err
+	}
+	storage.Metrics = storage.fromList(metrics)
+	return nil
+}
+
+func (storage *Storage) fromList(metrics []models.Metrics) map[string]models.Metrics {
+	mapping := make(map[string]models.Metrics)
+	for _, metric := range metrics {
+		mapping[metric.ID] = metric
+	}
+	return mapping
 }
 
 func (storage *Storage) Update(newMetric models.Metrics) {
@@ -50,6 +109,11 @@ func (storage *Storage) Update(newMetric models.Metrics) {
 		}
 	}
 	storage.Metrics[newMetric.ID] = newMetric
+	if storage.StreamWrite {
+		if err := storage.Flush(); err != nil {
+			logger.GetLogger().Error(err)
+		}
+	}
 }
 
 func (storage *Storage) GetAll() []models.Metrics {
@@ -68,11 +132,5 @@ func (storage *Storage) toList() (lst []models.Metrics) {
 	for _, metric := range storage.Metrics {
 		lst = append(lst, metric)
 	}
-	slices.SortFunc(lst, func(a, b models.Metrics) int {
-		if a.ID > b.ID {
-			return 1
-		}
-		return -1
-	})
 	return
 }
