@@ -27,5 +27,7 @@ vendor/
 # Task files
 Taskfile.yml
 
-# Data files
+# Exclude data files
+# include only folder
 data/*
+!data/.gitkeep 
