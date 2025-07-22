@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -128,25 +127,34 @@ func (agent *Agent) Update(pollInterval int) {
 }
 
 func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
-	var postData io.Reader = bytes.NewBuffer(data)
-	compression := ""
-	
+	var postData bytes.Buffer
+	var compression string
+
 	if compressed {
-		postData, err = gzip.NewReader(postData)
-		if err != nil {
+		gw := gzip.NewWriter(&postData)
+		if _, err := gw.Write(data); err != nil {
 			return nil, err
 		}
-		compression = ""
+		if err := gw.Close(); err != nil {
+			logger.GetLogger().Errorf("failed to close gzip writer: %w", err)
+		}
+		compression = "gzip"
+	} else {
+		if _, err := postData.Write(data); err != nil {
+			logger.GetLogger().Errorf("failed to write uncompressed: %w", err)
+			return nil, err
+		}
 	}
-	
-	req, err := http.NewRequest(http.MethodPost, url, postData)
+
+	req, err := http.NewRequest(http.MethodPost, url, &postData)
 	if err != nil {
 		return
 	}
 
 	req.Header.Set("Content-Encoding", compression)
+	req.Header.Set("Content-Type", "application/json")
 	resp, err = agent.Client.Do(req)
-	return 
+	return
 }
 
 func (agent *Agent) SendMetric(key string) error {
@@ -160,17 +168,13 @@ func (agent *Agent) SendMetric(key string) error {
 		return err
 	}
 
-	// pathSuffix := metric.ToString()
 	pathParams := []string{"update"}
-	// pathParams = append(pathParams, pathSuffix[:]...)
-
 	postPath, err := url.JoinPath(agent.address, pathParams...)
 	if err != nil {
 		return errs.ErrorWrongPath
 	}
 
-
-	if resp, err := agent.Client.Post(postPath, "application/json", bytes.NewBuffer(data)); err != nil {
+	if resp, err := agent.Post(postPath, data, true); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}

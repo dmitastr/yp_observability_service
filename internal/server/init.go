@@ -3,7 +3,7 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 
-	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/env_config"
+	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
 	filestorage "github.com/dmitastr/yp_observability_service/internal/datasources/file_storage"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
@@ -14,7 +14,7 @@ import (
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 
-func NewServer(cfg envconfig.Config) *chi.Mux {
+func NewServer(cfg serverenvconfig.Config) *chi.Mux {
 	storage := db.NewStorage(*cfg.FileStoragePath, *cfg.StoreInterval, *cfg.Restore)
 	service := service.NewService(storage)
 
