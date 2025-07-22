@@ -138,3 +138,7 @@ func (storage *Storage) toList() (lst []models.Metrics) {
 	}
 	return
 }
+
+func (storage *Storage) Close() error {
+	return storage.Flush()
+}

@@ -12,9 +12,10 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
+	"github.com/dmitastr/yp_observability_service/internal/repository"
 )
 
-func NewServer(cfg serverenvconfig.Config) *chi.Mux {
+func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 	storage := db.NewStorage(*cfg.FileStoragePath, *cfg.StoreInterval, *cfg.Restore)
 	service := service.NewService(storage)
 
@@ -48,5 +49,5 @@ func NewServer(cfg serverenvconfig.Config) *chi.Mux {
 		r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
 	})
 	
-	return router
+	return router, storage
 }

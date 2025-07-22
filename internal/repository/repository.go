@@ -7,4 +7,5 @@ type Database interface {
 	GetAll() []models.Metrics
 	Get(key string) *models.Metrics
 	Flush() error
+	Close() error
 }

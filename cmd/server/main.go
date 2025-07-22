@@ -26,7 +26,8 @@ func main() {
 	logger.Initialize()
 	cfg := serverenvconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore)
 
-	router := server.NewServer(cfg)
+	router, db := server.NewServer(cfg)
+	defer db.Close()
 
 	logger.GetLogger().Infof("Starting server=%s\n", *cfg.Address)
 	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
