@@ -71,6 +71,8 @@ func (storage *Storage) OpenFile() *os.File {
 }
 
 func (storage *Storage) Flush() error {
+	storage.Lock()
+	defer storage.Unlock()
 	file := storage.CreateFile()
 	if err := json.NewEncoder(file).Encode(storage.toList()); err != nil {
 		logger.GetLogger().Error(err)
@@ -80,6 +82,8 @@ func (storage *Storage) Flush() error {
 }
 
 func (storage *Storage) Load() error {
+	storage.Lock()
+	defer storage.Unlock()
 	file, err := os.Open(storage.FileName)
 	if err != nil {
 		logger.GetLogger().Error("error while opening file '%s': %s", storage.FileName, err)
