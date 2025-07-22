@@ -15,9 +15,9 @@ type Metric interface {
 }
 
 type GaugeMetric struct {
-	ID    string
-	MType string
-	Value float64
+	ID    string `json:"id"`
+	MType string `json:"type"`
+	Value float64 `json:"value"`
 }
 
 func NewGaugeMetric(ID string, Value float64) *GaugeMetric {
@@ -46,9 +46,9 @@ func (m GaugeMetric) GetValue() any {
 }
 
 type CounterMetric struct {
-	ID    string
-	MType string
-	Value int64
+	ID    string `json:"id"`
+	MType string `json:"type"`
+	Value int64 `json:"delta"`
 }
 
 func NewCounterMetric(ID string, Value int64) *CounterMetric {

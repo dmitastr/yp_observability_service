@@ -37,13 +37,13 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 		{
 			name:     "POST method",
 			method:   http.MethodPost,
-			wantCode: http.StatusMethodNotAllowed,
+			wantCode: http.StatusOK,
 			pathParams: []pathParam{
 				{key: "name", value: "abc"},
 				{key: "mtype", value: "gauge"},
 			},
 			serviceErrOut: false,
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name:     "Bad path - missing param",

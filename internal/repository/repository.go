@@ -6,4 +6,6 @@ type Database interface {
 	Update(models.Metrics)
 	GetAll() []models.Metrics
 	Get(key string) *models.Metrics
+	Flush() error
+	Close() error
 }

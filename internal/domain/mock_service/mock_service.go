@@ -21,10 +21,8 @@ func (s MockService) ProcessUpdate(update.MetricUpdate) error {
 	return nil
 }
 
-func (s MockService) GetMetric(name, mType string) (*models.Metrics, error) {
-	value := 1.0
-	delta := int64(1)
-	m := models.Metrics{ID: name, MType: mType, Value: &value, Delta: &delta}
+func (s MockService) GetMetric(upd update.MetricUpdate) (*models.Metrics, error) {
+	m := models.FromUpdate(upd)
 	if s.WantErr {
 		return &m, ErrorMock
 	}

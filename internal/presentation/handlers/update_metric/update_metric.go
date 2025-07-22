@@ -1,11 +1,13 @@
 package updatemetric
 
 import (
-	"fmt"
+	"encoding/json"
 	"net/http"
 
-	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	"github.com/dmitastr/yp_observability_service/internal/errs"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
 type MetricHandler struct {
@@ -25,15 +27,25 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	mtype := req.PathValue("mtype")
 	name := req.PathValue("name")
 	value := req.PathValue("value")
-	upd := update.MetricUpdate{MType: mtype, MetricName: name, MetricValue: value}
-	fmt.Printf("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
-
-	if err := upd.IsValid(); err != nil {
-		http.Error(res, err.Error(), http.StatusNotFound)
+	logger.GetLogger().Infof("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
+	
+	upd, err := update.New(name, mtype, value)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err := handler.service.ProcessUpdate(upd)
+	if upd.IsEmpty() {
+		if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if !upd.IsValid() {
+		http.Error(res, errs.ErrorWrongPath.Error(), http.StatusNotFound)
+		return
+	}
+
+	err = handler.service.ProcessUpdate(upd)
 
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)

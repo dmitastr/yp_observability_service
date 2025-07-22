@@ -8,6 +8,6 @@ import (
 
 type ServiceAbstract interface {
 	ProcessUpdate(update.MetricUpdate) error
-	GetMetric(name, mType string) (*models.Metrics, error)
+	GetMetric(update.MetricUpdate) (*models.Metrics, error)
 	GetAll() ([]entity.DisplayMetric, error)
 }

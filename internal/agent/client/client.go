@@ -1,7 +1,9 @@
 package client
 
 import (
-	"fmt"
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
 const (
@@ -45,34 +48,6 @@ const (
 	RandomValue string = "RandomValue"
 	PollCount   string = "PollCount"
 )
-
-// Alloc
-// BuckHashSys
-// Frees
-// GCCPUFraction
-// GCSys
-// HeapAlloc
-// HeapIdle
-// HeapInuse
-// HeapObjects
-// HeapReleased
-// HeapSys
-// LastGC
-// Lookups
-// MCacheInuse
-// MCacheSys
-// MSpanInuse
-// MSpanSys
-// Mallocs
-// NextGC
-// NumForcedGC
-// NumGC
-// OtherSys
-// PauseTotalNs
-// StackInuse
-// StackSys
-// Sys
-// TotalAlloc
 
 type Agent struct {
 	Metrics map[string]metric.Metric
@@ -151,21 +126,55 @@ func (agent *Agent) Update(pollInterval int) {
 	}
 }
 
+func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
+	var postData bytes.Buffer
+	var compression string
+
+	if compressed {
+		gw := gzip.NewWriter(&postData)
+		if _, err := gw.Write(data); err != nil {
+			return nil, err
+		}
+		if err := gw.Close(); err != nil {
+			logger.GetLogger().Errorf("failed to close gzip writer: %w", err)
+		}
+		compression = "gzip"
+	} else {
+		if _, err := postData.Write(data); err != nil {
+			logger.GetLogger().Errorf("failed to write uncompressed: %w", err)
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, &postData)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Content-Encoding", compression)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = agent.Client.Do(req)
+	return
+}
+
 func (agent *Agent) SendMetric(key string) error {
 	metric, ok := agent.Metrics[key]
 	if !ok {
 		return errs.ErrorMetricDoesNotExist
 	}
-	pathSuffix := metric.ToString()
-	pathParams := []string{"update"}
-	pathParams = append(pathParams, pathSuffix[:]...)
 
+	data, err := json.Marshal(metric)
+	if err != nil {
+		return err
+	}
+
+	pathParams := []string{"update"}
 	postPath, err := url.JoinPath(agent.address, pathParams...)
 	if err != nil {
 		return errs.ErrorWrongPath
 	}
 
-	if resp, err := agent.Client.Post(postPath, "text/plain", nil); err != nil {
+	if resp, err := agent.Post(postPath, data, true); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
@@ -180,7 +189,7 @@ func (agent *Agent) SendData(reportInterval int) {
 	for range ticker.C {
 		for ID := range agent.Metrics {
 			if err := agent.SendMetric(ID); err != nil {
-				fmt.Println(err)
+				logger.GetLogger().Error(err)
 			}
 		}
 	}

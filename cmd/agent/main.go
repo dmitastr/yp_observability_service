@@ -2,10 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
+
 
 var serverAddress string
 var reportInterval int
@@ -19,8 +21,14 @@ func init() {
 
 func main() {
 	flag.Parse()
-	fmt.Printf("Starting client for server=%s, poll interval=%d, report interval=%d\n", serverAddress, pollInterval, reportInterval)
+	cfg := agentenvconfig.New(serverAddress, pollInterval, reportInterval)
 
-	agent := client.NewAgent(serverAddress)
-	agent.Run(pollInterval, reportInterval)
+	logger.GetLogger().Infof("Starting client for server=%s, poll interval=%d, report interval=%d", 
+		*cfg.Address, 
+		*cfg.PollInterval, 
+		*cfg.ReportInterval,
+	)
+
+	agent := client.NewAgent(*cfg.Address)
+	agent.Run(*cfg.PollInterval, *cfg.ReportInterval)
 }

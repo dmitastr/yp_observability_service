@@ -6,6 +6,8 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
 const (
@@ -23,7 +25,15 @@ type Metrics struct {
 	MType string   `json:"type"`
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
-	Hash  string   `json:"hash,omitempty"`
+	Hash  string   `json:"-"`
+}
+
+func FromUpdate(upd update.MetricUpdate) (m Metrics) {
+	m.Delta = upd.Delta
+	m.Value = upd.Value
+	m.ID = upd.MetricName
+	m.MType = upd.MType
+	return
 }
 
 func (m *Metrics) DeltaSet(value *int64) {
@@ -38,10 +48,18 @@ func (m *Metrics) GetValueString() (val string, err error) {
 	if m.Delta != nil {
 		val = strconv.FormatInt(*m.Delta, 10)
 	} else if m.Value != nil {
-		fmt.Printf("Raw value=%f\n", *m.Value)
 		val = formattools.FormatFloatTrimZero(*m.Value)
 	} else {
 		err = errs.ErrorValueFromEmptyMetric
 	}
 	return val, err
+}
+
+func (m *Metrics) String() string {
+	strVal, err := m.GetValueString()
+	if err != nil {
+		logger.GetLogger().Error(err)
+		return ""
+	}
+	return fmt.Sprintf("name=%s, type=%s, value=%s", m.ID, m.MType, strVal)
 }

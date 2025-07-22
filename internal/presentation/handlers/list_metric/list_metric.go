@@ -1,7 +1,6 @@
 package listmetric
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
 
@@ -25,13 +25,14 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 		res.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	res.Header().Set("Content-Type", "text/html")
 
 	metrics, err := handler.service.GetAll()
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf("Receive metrics: %v\n", metrics)
+	logger.GetLogger().Infof("Receive %d metrics from db", len(metrics))
 	
 	wd, err := os.Getwd()
 	if err != nil {
@@ -44,8 +45,8 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	templatePath := filepath.Join(parentPath, "web", "templates", "index.html")
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
+		logger.GetLogger().Error(err)
 		http.Error(res, "Template parsing error", http.StatusInternalServerError)
-		fmt.Println(err)
 		return
 	}
 
