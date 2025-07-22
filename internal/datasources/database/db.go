@@ -47,7 +47,7 @@ func NewStorage(fname string, storeInterval int, restore bool) *Storage {
 	if restore {
 		err := storage.Load()
 		if err != nil {
-			logger.GetLogger().Fatal(err)
+			logger.GetLogger().Error(err)
 		}
 	}
 
@@ -57,7 +57,7 @@ func NewStorage(fname string, storeInterval int, restore bool) *Storage {
 func (storage *Storage) CreateFile() *os.File {
 	file, err := os.Create(storage.FileName)
 	if err != nil {
-		logger.GetLogger().Panicf("error while opening file '%s': %s", storage.FileName, err)
+		logger.GetLogger().Panicf("error while creating file '%s': %s", storage.FileName, err)
 	}
 	return file
 }
@@ -80,7 +80,11 @@ func (storage *Storage) Flush() error {
 }
 
 func (storage *Storage) Load() error {
-	file := storage.OpenFile()
+	file, err := os.Open(storage.FileName)
+	if err != nil {
+		logger.GetLogger().Error("error while opening file '%s': %s", storage.FileName, err)
+		return err
+	}
 
 	metrics := make([]models.Metrics, 0)
 	if err := json.NewDecoder(file).Decode(&metrics); err != nil {

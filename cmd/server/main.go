@@ -9,7 +9,6 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
-
 var ServerAddress string
 var StoreInterval int
 var Restore bool
@@ -28,7 +27,6 @@ func main() {
 	cfg := envconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore)
 
 	router := server.NewServer(cfg)
-
 
 	logger.GetLogger().Infof("Starting server=%s\n", *cfg.Address)
 	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
