@@ -1,6 +1,9 @@
 package common
 
-import "github.com/caarlos0/env/v6"
+import (
+	"github.com/caarlos0/env/v6"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+)
 
 type Config struct {
 	Address         *string `env:"ADDRESS"`
@@ -12,7 +15,7 @@ type Config struct {
 func New(address string, storeInterval int, fileStoragePath string, restore bool) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
-		panic(err)
+		logger.GetLogger().Errorf("error while reading env variables=%s", err)
 	}
 	if cfg.Address == nil {
 		cfg.Address = &address
