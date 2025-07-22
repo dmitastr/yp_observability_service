@@ -4,7 +4,7 @@ import (
 	"flag"
 	"net/http"
 
-	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/env_config"
+	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
@@ -24,7 +24,7 @@ func init() {
 func main() {
 	flag.Parse()
 	logger.Initialize()
-	cfg := envconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore)
+	cfg := serverenvconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore)
 
 	router := server.NewServer(cfg)
 

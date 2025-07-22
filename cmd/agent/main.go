@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/client"
-	envconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/env_config"
+	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
@@ -21,7 +21,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	cfg := envconfig.New(serverAddress, pollInterval, reportInterval)
+	cfg := agentenvconfig.New(serverAddress, pollInterval, reportInterval)
 
 	logger.GetLogger().Infof("Starting client for server=%s, poll interval=%d, report interval=%d", 
 		*cfg.Address, 
