@@ -18,7 +18,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 	defer ctrl.Finish()
 
 	var delta int64 = 10
-	var value float64 = 99.9
+	value := 99.9
 	metric := models.Metrics{ID: "abc", MType: "gauge", Value: &value, Delta: &delta}
 
 	errFunc := func(serviceErrOut bool) (err error) {
