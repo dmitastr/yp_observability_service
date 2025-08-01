@@ -60,7 +60,7 @@ func NewStorage(cfg serverenvconfig.Config) *Storage {
 func (storage *Storage) CreateFile() *os.File {
 	file, err := os.Create(storage.FileName)
 	if err != nil {
-		logger.GetLogger().Panicf("error while creating file '%s': %s", storage.FileName, err)
+		logger.GetLogger().Errorf("error while creating file '%s': %w", storage.FileName, err)
 	}
 	return file
 }
@@ -68,7 +68,7 @@ func (storage *Storage) CreateFile() *os.File {
 func (storage *Storage) OpenFile() *os.File {
 	file, err := os.Open(storage.FileName)
 	if err != nil {
-		logger.GetLogger().Panicf("error while opening file '%s': %s", storage.FileName, err)
+		logger.GetLogger().Errorf("error while opening file '%s': %w", storage.FileName, err)
 	}
 	return file
 }

@@ -27,10 +27,12 @@ var (
 )
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
+	var errConnecting error
 	pgOnce.Do(func() {
 		db, err := pgxpool.New(ctx, *cfg.DBUrl)
 		if err != nil {
-			panic(err)
+			errConnecting = fmt.Errorf("failed to connect to db with url=%s: %w", *cfg.DBUrl, err)
+			return 
 		}
 		streamWrite := false
 		if *cfg.StoreInterval == 0 {
@@ -44,7 +46,8 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 			}
 		}
 	})
-	return pgInstance, nil
+
+	return pgInstance, errConnecting
 }
 
 func (pg *Postgres) Ping(ctx context.Context) error {
