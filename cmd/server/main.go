@@ -31,7 +31,7 @@ func main() {
 	router, db := server.NewServer(cfg)
 	defer db.Close()
 
-	logger.GetLogger().Infof("Starting server=%s\n", *cfg.Address)
+	logger.GetLogger().Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
 	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 		panic(err)
 	}

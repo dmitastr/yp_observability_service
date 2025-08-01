@@ -31,7 +31,7 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	pgOnce.Do(func() {
 		db, err := pgxpool.New(ctx, *cfg.DBUrl)
 		if err != nil {
-			errConnecting = fmt.Errorf("failed to connect to db with url=%s: %w", *cfg.DBUrl, err)
+			errConnecting = fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
 			return 
 		}
 		streamWrite := false
@@ -64,7 +64,7 @@ func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 	args := metric.ToNamedArgs()
 	_, err := pg.db.Exec(ctx, query, args)
 	if err != nil {
-		logger.GetLogger().Errorf("unable to insert row: %w", err)
+		logger.GetLogger().Errorf("unable to insert row: %v", err)
 		return err
 	}
 
@@ -88,7 +88,7 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 	)
 
 	if err != nil {
-		return fmt.Errorf("error copying into %s table: %w", tableName, err)
+		return fmt.Errorf("error copying into %s table: %v", tableName, err)
 	}
 
 	return nil
@@ -99,7 +99,7 @@ func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, erro
 
 	rows, err := pg.db.Query(ctx, query, pgx.NamedArgs{"name": name})
 	if err != nil {
-		logger.GetLogger().Errorf("unable to query users: %w", err)
+		logger.GetLogger().Errorf("unable to query users: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -119,7 +119,7 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 
 	rows, err := pg.db.Query(ctx, query)
 	if err != nil {
-		logger.GetLogger().Errorf("unable to query users: %w", err)
+		logger.GetLogger().Errorf("unable to query users: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
