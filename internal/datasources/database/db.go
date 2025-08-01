@@ -1,10 +1,13 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"sync"
 
+	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
+	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
@@ -38,13 +41,13 @@ type Storage struct {
 	StreamWrite bool
 }
 
-func NewStorage(fname string, storeInterval int, restore bool) *Storage {
-	storage := Storage{FileName: fname, Metrics: make(map[string]models.Metrics)}
-	if storeInterval == 0 {
+func NewStorage(cfg serverenvconfig.Config) *Storage {
+	storage := Storage{FileName: *cfg.FileStoragePath, Metrics: make(map[string]models.Metrics)}
+	if *cfg.StoreInterval == 0 {
 		storage.StreamWrite = true
 	}
 
-	if restore {
+	if *cfg.Restore {
 		err := storage.Load()
 		if err != nil {
 			logger.GetLogger().Error(err)
@@ -107,7 +110,7 @@ func (storage *Storage) fromList(metrics []models.Metrics) map[string]models.Met
 	return mapping
 }
 
-func (storage *Storage) Update(newMetric models.Metrics) {
+func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) error {
 	logger.GetLogger().Infof("Get new data: %s", newMetric.String())
 	storage.Lock()
 	defer storage.Unlock()
@@ -122,18 +125,19 @@ func (storage *Storage) Update(newMetric models.Metrics) {
 			logger.GetLogger().Error(err)
 		}
 	}
+	return nil
 }
 
-func (storage *Storage) GetAll() []models.Metrics {
-	return storage.toList()
+func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
+	return storage.toList(), nil
 }
 
-func (storage *Storage) Get(key string) *models.Metrics {
+func (storage *Storage) Get(ctx context.Context, key string) (*models.Metrics, error) {
 	if metric, ok := storage.Metrics[key]; ok {
 		logger.GetLogger().Infof("Found metric: %s", metric)
-		return &metric
+		return &metric, nil
 	}
-	return nil
+	return nil, errs.ErrorMetricDoesNotExist
 }
 
 func (storage *Storage) toList() (lst []models.Metrics) {
@@ -145,4 +149,8 @@ func (storage *Storage) toList() (lst []models.Metrics) {
 
 func (storage *Storage) Close() error {
 	return storage.Flush()
+}
+
+func (storage *Storage) Ping(ctx context.Context) error {
+	return nil
 }

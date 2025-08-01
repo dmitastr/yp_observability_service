@@ -1,6 +1,7 @@
 package listmetric
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"os"
@@ -27,7 +28,7 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	}
 	res.Header().Set("Content-Type", "text/html")
 
-	metrics, err := handler.service.GetAll()
+	metrics, err := handler.service.GetAll(context.TODO())
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

@@ -1,14 +1,19 @@
 package server
 
 import (
+	"context"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
 	filestorage "github.com/dmitastr/yp_observability_service/internal/datasources/file_storage"
+	postgresstorage "github.com/dmitastr/yp_observability_service/internal/datasources/postgres_storage"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
+	pingdatabase "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/ping_database"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
@@ -16,8 +21,12 @@ import (
 )
 
 func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
-	storage := db.NewStorage(*cfg.FileStoragePath, *cfg.StoreInterval, *cfg.Restore)
-	service := service.NewService(storage)
+	storage := db.NewStorage(cfg)
+	pgstorage, err := postgresstorage.NewPG(context.TODO(), cfg)
+	if err != nil {
+		logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+	}
+	service := service.NewService(storage, pgstorage)
 
 	if *cfg.StoreInterval != 0 {
 		fileStorage := filestorage.New(storage, *cfg.StoreInterval)
@@ -27,6 +36,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 	metricHandler := updatemetric.NewHandler(service)
 	getMetricHandler := getmetric.NewHandler(service)
 	listMetricsHandler := listmetric.NewHandler(service)
+	pingHandler := pingdatabase.New(service)
 
 	router := chi.NewRouter()
 
@@ -48,6 +58,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 		r.Post(`/`, getMetricHandler.ServeHTTP)
 		r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
 	})
+
+	router.Get(`/ping`, pingHandler.ServeHTTP)
 	
 	return router, storage
 }

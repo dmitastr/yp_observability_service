@@ -1,11 +1,16 @@
 package repository
 
-import models "github.com/dmitastr/yp_observability_service/internal/model"
+import (
+	"context"
+
+	models "github.com/dmitastr/yp_observability_service/internal/model"
+)
 
 type Database interface {
-	Update(models.Metrics)
-	GetAll() []models.Metrics
-	Get(key string) *models.Metrics
+	Update(context.Context, models.Metrics) error
+	GetAll(context.Context) ([]models.Metrics, error)
+	Get(context.Context, string) (*models.Metrics, error)
 	Flush() error
 	Close() error
+	Ping(context.Context) error
 }

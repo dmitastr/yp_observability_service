@@ -1,6 +1,7 @@
 package getmetric
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -44,7 +45,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	metric, err := handler.service.GetMetric(upd)
+	metric, err := handler.service.GetMetric(context.TODO(), upd)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusNotFound)
 		return

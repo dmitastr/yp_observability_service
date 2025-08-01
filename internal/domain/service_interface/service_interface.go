@@ -1,13 +1,16 @@
 package serviceinterface
 
 import (
-	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
-	"github.com/dmitastr/yp_observability_service/internal/model"
+	"context"
+
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
+	"github.com/dmitastr/yp_observability_service/internal/model"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
 type ServiceAbstract interface {
-	ProcessUpdate(update.MetricUpdate) error
-	GetMetric(update.MetricUpdate) (*models.Metrics, error)
-	GetAll() ([]entity.DisplayMetric, error)
+	ProcessUpdate(context.Context, update.MetricUpdate) error
+	GetMetric(context.Context, update.MetricUpdate) (*models.Metrics, error)
+	GetAll(context.Context) ([]entity.DisplayMetric, error)
+	Ping(context.Context) error
 }

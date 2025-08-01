@@ -1,6 +1,7 @@
 package updatemetric
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -45,7 +46,8 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	err = handler.service.ProcessUpdate(upd)
+	ctx := context.TODO()
+	err = handler.service.ProcessUpdate(ctx, upd)
 
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)

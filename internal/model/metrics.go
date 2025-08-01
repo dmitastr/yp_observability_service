@@ -8,6 +8,7 @@ import (
 	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -21,11 +22,11 @@ const (
 // что бы отличать значение "0", от не заданного значения
 // и соответственно не кодировать в структуру.
 type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-	Hash  string   `json:"-"`
+	ID    string   `json:"id" db:"name"`
+	MType string   `json:"type" db:"mtype"`
+	Delta *int64   `json:"delta,omitempty" db:"delta"`
+	Value *float64 `json:"value,omitempty" db:"value"`
+	Hash  string   `json:"-" db:"-"`
 }
 
 func FromUpdate(upd update.MetricUpdate) (m Metrics) {
@@ -62,4 +63,14 @@ func (m *Metrics) String() string {
 		return ""
 	}
 	return fmt.Sprintf("name=%s, type=%s, value=%s", m.ID, m.MType, strVal)
+}
+
+func (m *Metrics) ToNamedArgs() pgx.NamedArgs {
+	args := pgx.NamedArgs{
+		"name":  m.ID,
+		"mtype": m.MType,
+		"value": m.Value,
+		"delta": m.Delta,
+	}
+	return args
 }
