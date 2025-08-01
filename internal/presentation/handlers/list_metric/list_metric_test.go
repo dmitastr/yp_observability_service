@@ -1,14 +1,29 @@
 package listmetric
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/domain/mock_service"
+	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
+	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 func TestListMetricsHandler_ServeHTTP(t *testing.T) {
+	metrics := []entity.DisplayMetric{{Name: "abc", Type: "gauge", StringValue: "10"}}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	errFunc := func(serviceErrOut bool) (err error) {
+		if serviceErrOut {
+			err = errors.New("mocked error")
+		}
+		return
+	}
+	
 	tests := []struct {
 		name          string
 		method        string
@@ -45,7 +60,10 @@ func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSrv := mockservice.MockService{WantErr: tt.serviceErrOut}
+			mockSrv := mocks.NewMockServiceAbstract(ctrl)
+			errValue := errFunc(tt.serviceErrOut)
+			mockSrv.EXPECT().GetAll(context.TODO()).Return(metrics, errValue).AnyTimes()
+
 			handler := NewHandler(mockSrv)
 
 			req := httptest.NewRequest(tt.method, tt.url, nil)
