@@ -10,7 +10,7 @@ type Config struct {
 	StoreInterval   *int    `env:"STORE_INTERVAL"`
 	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool   `env:"RESTORE"`
-	DBUrl           *string `env:"DB_URL"`
+	DBUrl           *string `env:"DATABASE_DSN"`
 }
 
 func New(address string, storeInterval int, fileStoragePath string, restore bool, dbURL string) (cfg Config) {
