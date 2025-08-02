@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS metrics
     delta bigint,
     value double precision,
     mtype text NOT NULL,
-    CONSTRAINT metrics_pkey PRIMARY KEY (id)
+    CONSTRAINT metrics_pkey PRIMARY KEY (name, mtype)
 );
 
 

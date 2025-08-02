@@ -49,11 +49,12 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
-	
+
 	err = handler.service.ProcessUpdate(ctx, upd)
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		res.WriteHeader(http.StatusBadRequest)
+		res.Write([]byte(err.Error()))
 		return
 	}
 

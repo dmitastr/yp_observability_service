@@ -87,15 +87,25 @@ func (pg *Postgres) Close() error {
 }
 
 func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
-	query := `INSERT INTO metrics (name, mtype, value, delta) VALUES (@name, @mtype, @value, @delta)`
-	args := metric.ToNamedArgs()
-	_, err := pg.db.Exec(ctx, query, args)
+	tx, err := pg.db.Begin(ctx)
 	if err != nil {
+		return err
+	}
+	query := `INSERT INTO metrics (name, mtype, value, delta) 
+	VALUES (@name, @mtype, @value, @delta)
+	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET
+    value = @value,
+    delta = @delta `
+
+	args := metric.ToNamedArgs()
+	
+	if _, err := tx.Exec(ctx, query, args); err != nil {
+		tx.Rollback(ctx)
 		logger.GetLogger().Errorf("unable to insert row: %v", err)
 		return err
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
