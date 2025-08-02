@@ -48,10 +48,7 @@ func NewStorage(cfg serverenvconfig.Config) *Storage {
 	}
 
 	if *cfg.Restore {
-		err := storage.Load()
-		if err != nil {
-			logger.GetLogger().Error(err)
-		}
+		storage.Load()
 	}
 
 	return &storage

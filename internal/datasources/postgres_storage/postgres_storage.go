@@ -40,10 +40,8 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 		}
 		pgInstance = &Postgres{db: db, FileName: *cfg.FileStoragePath, StreamWrite: streamWrite}
 		if *cfg.Restore {
-			err := pgInstance.Load()
-			if err != nil {
-				logger.GetLogger().Error(err)
-			}
+			pgInstance.Load()
+
 		}
 	})
 
@@ -160,7 +158,7 @@ func (pg *Postgres) Flush() error {
 func (pg *Postgres) Load() error {
 	file, err := os.Open(pg.FileName)
 	if err != nil {
-		logger.GetLogger().Errorf("error while opening file '%s': %s", pg.FileName, err)
+		logger.GetLogger().Infof("error while opening file '%s': %s", pg.FileName, err)
 		return err
 	}
 
