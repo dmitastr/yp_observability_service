@@ -10,7 +10,7 @@ type Database interface {
 	Update(context.Context, models.Metrics) error
 	GetAll(context.Context) ([]models.Metrics, error)
 	Get(context.Context, string) (*models.Metrics, error)
-	Flush() error
 	Close() error
 	Ping(context.Context) error
+	RunBackup()
 }
