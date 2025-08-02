@@ -1,7 +1,6 @@
 package updatemetric
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +13,6 @@ import (
 )
 
 func TestMetricHandler_ServeHTTP(t *testing.T) {
-	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -90,13 +88,15 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.url, nil)
+
 			mockSrv := mocks.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
-			mockSrv.EXPECT().ProcessUpdate(ctx, gomock.Any()).Return(errValue).AnyTimes()
+
+			mockSrv.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
 			
 			handler := NewHandler(mockSrv)
 			
-			req := httptest.NewRequest(tt.method, tt.url, nil)
 			rr := httptest.NewRecorder()
 			for _, pp := range tt.pathParams {
 				req.SetPathValue(pp.key, pp.value)

@@ -1,7 +1,6 @@
 package listmetric
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -62,7 +61,7 @@ func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSrv := mocks.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
-			mockSrv.EXPECT().GetAll(context.TODO()).Return(metrics, errValue).AnyTimes()
+			mockSrv.EXPECT().GetAll(gomock.Any()).Return(metrics, errValue).AnyTimes()
 
 			handler := NewHandler(mockSrv)
 

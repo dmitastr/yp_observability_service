@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -45,7 +46,9 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	metric, err := handler.service.GetMetric(context.TODO(), upd)
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	metric, err := handler.service.GetMetric(ctx, upd)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusNotFound)
 		return

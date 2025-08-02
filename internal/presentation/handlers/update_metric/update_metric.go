@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -46,7 +47,9 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	
 	err = handler.service.ProcessUpdate(ctx, upd)
 
 	if err != nil {

@@ -1,7 +1,6 @@
 package getmetric
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -90,7 +89,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSrv := mocks.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
-			mockSrv.EXPECT().GetMetric(context.TODO(), gomock.Any()).Return(&metric, errValue).AnyTimes()
+			mockSrv.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, errValue).AnyTimes()
 			
 			handler := NewHandler(mockSrv)
 
