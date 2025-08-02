@@ -34,9 +34,6 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 
 	service := service.NewService(storage)
 
-	if *cfg.StoreInterval != 0 {
-	}
-
 	metricHandler := updatemetric.NewHandler(service)
 	getMetricHandler := getmetric.NewHandler(service)
 	listMetricsHandler := listmetric.NewHandler(service)
