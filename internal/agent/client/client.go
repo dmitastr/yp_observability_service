@@ -136,12 +136,12 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 			return nil, err
 		}
 		if err := gw.Close(); err != nil {
-			logger.GetLogger().Errorf("failed to close gzip writer: %w", err)
+			logger.GetLogger().Errorf("failed to close gzip writer: %v", err)
 		}
 		compression = "gzip"
 	} else {
 		if _, err := postData.Write(data); err != nil {
-			logger.GetLogger().Errorf("failed to write uncompressed: %w", err)
+			logger.GetLogger().Errorf("failed to write uncompressed: %v", err)
 			return nil, err
 		}
 	}

@@ -131,7 +131,7 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 func (pg *Postgres) CreateFile() *os.File {
 	file, err := os.Create(pg.FileName)
 	if err != nil {
-		logger.GetLogger().Panicf("error while creating file '%s': %s", pg.FileName, err)
+		logger.GetLogger().Infof("error while creating file '%s': %s", pg.FileName, err)
 	}
 	return file
 }
@@ -139,7 +139,7 @@ func (pg *Postgres) CreateFile() *os.File {
 func (pg *Postgres) OpenFile() *os.File {
 	file, err := os.Open(pg.FileName)
 	if err != nil {
-		logger.GetLogger().Panicf("error while opening file '%s': %s", pg.FileName, err)
+		logger.GetLogger().Infof("error while opening file '%s': %s", pg.FileName, err)
 	}
 	return file
 }
@@ -160,7 +160,7 @@ func (pg *Postgres) Flush() error {
 func (pg *Postgres) Load() error {
 	file, err := os.Open(pg.FileName)
 	if err != nil {
-		logger.GetLogger().Error("error while opening file '%s': %s", pg.FileName, err)
+		logger.GetLogger().Errorf("error while opening file '%s': %s", pg.FileName, err)
 		return err
 	}
 
