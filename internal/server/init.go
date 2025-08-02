@@ -7,7 +7,6 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
-	filestorage "github.com/dmitastr/yp_observability_service/internal/datasources/file_storage"
 	postgresstorage "github.com/dmitastr/yp_observability_service/internal/datasources/postgres_storage"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
@@ -21,16 +20,21 @@ import (
 )
 
 func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
-	storage := db.NewStorage(cfg)
-	pgstorage, err := postgresstorage.NewPG(context.TODO(), cfg)
-	if err != nil {
-		logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+	var storage repository.Database
+	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
+		storage = db.NewStorage(cfg)
+		storage.RunBackup()
+	} else {
+		var err error
+		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
+		if err != nil {
+			logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+		}
 	}
-	service := service.NewService(storage, pgstorage)
+
+	service := service.NewService(storage)
 
 	if *cfg.StoreInterval != 0 {
-		fileStorage := filestorage.New(storage, *cfg.StoreInterval)
-		fileStorage.Run()
 	}
 
 	metricHandler := updatemetric.NewHandler(service)

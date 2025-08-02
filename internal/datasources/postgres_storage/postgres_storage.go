@@ -2,23 +2,26 @@ package postgresstorage
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/golang-migrate/migrate/v4"
+    "github.com/golang-migrate/migrate/v4/database/postgres"
+    _ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Postgres struct {
 	db *pgxpool.Pool
-	FileName    string
-	StreamWrite bool
 }
 
 var (
@@ -29,24 +32,50 @@ var (
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	var errConnecting error
 	pgOnce.Do(func() {
-		db, err := pgxpool.New(ctx, *cfg.DBUrl)
+		dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
+		if err != nil {
+			logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
+		}
+		pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 		if err != nil {
 			errConnecting = fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
 			return 
 		}
-		streamWrite := false
-		if *cfg.StoreInterval == 0 {
-			streamWrite = true
-		}
-		pgInstance = &Postgres{db: db, FileName: *cfg.FileStoragePath, StreamWrite: streamWrite}
-		if *cfg.Restore {
-			pgInstance.Load()
-
-		}
+		logger.GetLogger().Info("Database connection established successfully")
+		
+		pgInstance = &Postgres{db: pool}
+		
 	})
+	
+	db, err := sql.Open("postgres", *cfg.DBUrl)
+	if err != nil {
+		logger.GetLogger().Fatalf("Unable to connect to database: %v", err)
+	}
+	// Create migration instance
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		logger.GetLogger().Fatal(err)
+	}
+	
+	// Point to your migration files. Here we're using local files, but it could be other sources.
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		logger.GetLogger().Fatal(err)
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		logger.GetLogger().Fatalf("Migration up failed: %v", err)
+	}
+	fmt.Println("Migration up completed successfully")
 
 	return pgInstance, errConnecting
 }
+
+
 
 func (pg *Postgres) Ping(ctx context.Context) error {
 	return pg.db.Ping(ctx)
@@ -125,47 +154,5 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return  pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
 }
 
-
-func (pg *Postgres) CreateFile() *os.File {
-	file, err := os.Create(pg.FileName)
-	if err != nil {
-		logger.GetLogger().Infof("error while creating file '%s': %s", pg.FileName, err)
-	}
-	return file
-}
-
-func (pg *Postgres) OpenFile() *os.File {
-	file, err := os.Open(pg.FileName)
-	if err != nil {
-		logger.GetLogger().Infof("error while opening file '%s': %s", pg.FileName, err)
-	}
-	return file
-}
-
-func (pg *Postgres) Flush() error {
-	file := pg.CreateFile()
-	metrics, err := pg.GetAll(context.TODO())
-	if err != nil {
-		return err
-	}
-	if err := json.NewEncoder(file).Encode(metrics); err != nil {
-		logger.GetLogger().Error(err)
-		return err
-	}
-	return nil
-}
-
-func (pg *Postgres) Load() error {
-	file, err := os.Open(pg.FileName)
-	if err != nil {
-		logger.GetLogger().Infof("error while opening file '%s': %s", pg.FileName, err)
-		return err
-	}
-
-	metrics := make([]models.Metrics, 0)
-	if err := json.NewDecoder(file).Decode(&metrics); err != nil {
-		logger.GetLogger().Fatal(err)
-		return err
-	}
-	return pg.BulkUpdate(context.TODO(), metrics)
-}
+// dummy function to satisfy interface
+func (pg *Postgres) RunBackup() {}

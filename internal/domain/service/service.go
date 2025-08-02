@@ -14,11 +14,10 @@ import (
 
 type Service struct {
 	db   repository.Database
-	pgdb repository.Database
 }
 
-func NewService(db repository.Database, postgresDB repository.Database) *Service {
-	return &Service{db: db, pgdb: postgresDB}
+func NewService(db repository.Database) *Service {
+	return &Service{db: db}
 }
 
 func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
@@ -63,5 +62,5 @@ func (service Service) GetAll(ctx context.Context) (metricLst []entity.DisplayMe
 }
 
 func (service Service) Ping(ctx context.Context) error {
-	return service.pgdb.Ping(ctx)
+	return service.db.Ping(ctx)
 }
