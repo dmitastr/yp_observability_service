@@ -14,6 +14,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
 	pingdatabase "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/ping_database"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
+	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 	"github.com/dmitastr/yp_observability_service/internal/repository"
@@ -35,6 +36,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 	service := service.NewService(storage)
 
 	metricHandler := updatemetric.NewHandler(service)
+	metricBatchHandler := updatemetricsbatch.NewHandler(service)
 	getMetricHandler := getmetric.NewHandler(service)
 	listMetricsHandler := listmetric.NewHandler(service)
 	pingHandler := pingdatabase.New(service)
@@ -54,6 +56,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 		r.Post(`/`, metricHandler.ServeHTTP)
 		r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
 	})
+
+	router.Post(`/updates`, metricBatchHandler.ServeHTTP)
 
 	router.Route(`/value`, func(r chi.Router) {
 		r.Post(`/`, getMetricHandler.ServeHTTP)

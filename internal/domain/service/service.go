@@ -27,6 +27,10 @@ func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdat
 	return err
 }
 
+func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics) error {
+	return service.db.BulkUpdate(ctx, metrics)
+}
+
 func (service Service) GetMetric(ctx context.Context, upd update.MetricUpdate) (metric *models.Metrics, err error) {
 	metric, err = service.db.Get(ctx, upd.MetricName)
 	if err != nil {

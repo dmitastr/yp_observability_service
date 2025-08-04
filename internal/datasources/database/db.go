@@ -96,6 +96,18 @@ func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) er
 	return nil
 }
 
+
+func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
+	logger.GetLogger().Infof("Get %d new metrics", len(metrics))
+	for _, metric := range metrics {
+		err := storage.Update(ctx, metric)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return storage.toList(), nil
 }

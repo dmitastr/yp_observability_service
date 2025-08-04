@@ -14,10 +14,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/tracelog"
 
 	"github.com/golang-migrate/migrate/v4"
-    "github.com/golang-migrate/migrate/v4/database/postgres"
-    _ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Postgres struct {
@@ -29,25 +30,16 @@ var (
 	pgOnce     sync.Once
 )
 
-func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
-	var errConnecting error
-	pgOnce.Do(func() {
-		dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
-		if err != nil {
-			logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
-		}
-		pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
-		if err != nil {
-			errConnecting = fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
-			return 
-		}
-		logger.GetLogger().Info("Database connection established successfully")
-		
-		pgInstance = &Postgres{db: pool}
-		
-	})
+const query string = `INSERT INTO metrics (name, mtype, value, delta) 
+	VALUES (@name, @mtype, @value, @delta)
+	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET
+    value = @value,
+    delta = @delta `
+
 	
+func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	db, err := sql.Open("postgres", *cfg.DBUrl)
+	 // important to avoid leaking connections
 	if err != nil {
 		logger.GetLogger().Fatalf("Unable to connect to database: %v", err)
 	}
@@ -56,13 +48,9 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	if err != nil {
 		logger.GetLogger().Fatal(err)
 	}
-	
+
 	// Point to your migration files. Here we're using local files, but it could be other sources.
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://migrations",
-		"postgres",
-		driver,
-	)
+	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
 	if err != nil {
 		logger.GetLogger().Fatal(err)
 	}
@@ -70,12 +58,30 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		logger.GetLogger().Fatalf("Migration up failed: %v", err)
 	}
-	fmt.Println("Migration up completed successfully")
+	if err := db.Close(); err != nil {
+		return nil, err
+	}
+	logger.GetLogger().Info("Migration up completed successfully")
 
-	return pgInstance, errConnecting
+	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
+	if err != nil {
+		logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
+	}
+	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
+		Logger:   logger.GetLogger(),
+		LogLevel: tracelog.LogLevelDebug,
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
+	}
+	logger.GetLogger().Info("Database connection established successfully")
+
+	pgInstance = &Postgres{db: pool}
+
+	return pgInstance, nil
 }
-
-
 
 func (pg *Postgres) Ping(ctx context.Context) error {
 	return pg.db.Ping(ctx)
@@ -91,14 +97,9 @@ func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 	if err != nil {
 		return err
 	}
-	query := `INSERT INTO metrics (name, mtype, value, delta) 
-	VALUES (@name, @mtype, @value, @delta)
-	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET
-    value = @value,
-    delta = @delta `
 
 	args := metric.ToNamedArgs()
-	
+
 	if _, err := tx.Exec(ctx, query, args); err != nil {
 		tx.Rollback(ctx)
 		logger.GetLogger().Errorf("unable to insert row: %v", err)
@@ -109,27 +110,37 @@ func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 }
 
 func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
-	entries := [][]any{}
-	columns := []string{"name", "mtype", "value", "delta"}
-	tableName := "metrics"
-
-	for _, metric := range metrics {
-		entries = append(entries, []any{metric.ID, metric.MType, metric.Value, metric.Delta})
-	}
-
-	_, err := pg.db.CopyFrom(
-		ctx,
-		pgx.Identifier{tableName},
-		columns,
-		pgx.CopyFromRows(entries),
-	)
-
+	tx, err := pg.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("error copying into %s table: %v", tableName, err)
+		return fmt.Errorf("unable to start transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx) 
+	}()
+
+	batch := &pgx.Batch{}
+	for _, metric := range metrics {
+		args := metric.ToNamedArgs()
+		batch.Queue(query, args)
+	}
+	br := tx.SendBatch(ctx, batch)
+	
+	for range metrics {
+		_, err := br.Exec()
+		if err != nil {
+			return fmt.Errorf("batch exec failed at item: %w", err)
+		}
+	}
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+	
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
 	}
 
 	return nil
-} 
+}
 
 func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
 	query := `SELECT name, mtype, value, delta FROM metrics WHERE name=@name`
@@ -161,7 +172,7 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	}
 	defer rows.Close()
 
-	return  pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
+	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
 }
 
 // dummy function to satisfy interface

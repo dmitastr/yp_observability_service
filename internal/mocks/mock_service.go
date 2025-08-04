@@ -37,6 +37,20 @@ func (m *MockServiceAbstract) EXPECT() *MockServiceAbstractMockRecorder {
 	return m.recorder
 }
 
+// BatchUpdate mocks base method.
+func (m *MockServiceAbstract) BatchUpdate(arg0 context.Context, arg1 []models.Metrics) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchUpdate", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchUpdate indicates an expected call of BatchUpdate.
+func (mr *MockServiceAbstractMockRecorder) BatchUpdate(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdate", reflect.TypeOf((*MockServiceAbstract)(nil).BatchUpdate), arg0, arg1)
+}
+
 // GetAll mocks base method.
 func (m *MockServiceAbstract) GetAll(arg0 context.Context) ([]entity.DisplayMetric, error) {
 	m.ctrl.T.Helper()

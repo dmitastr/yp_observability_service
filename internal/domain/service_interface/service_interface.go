@@ -10,6 +10,7 @@ import (
 
 type ServiceAbstract interface {
 	ProcessUpdate(context.Context, update.MetricUpdate) error
+	BatchUpdate(context.Context, []models.Metrics) error
 	GetMetric(context.Context, update.MetricUpdate) (*models.Metrics, error)
 	GetAll(context.Context) ([]entity.DisplayMetric, error)
 	Ping(context.Context) error
