@@ -35,17 +35,15 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
 	
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	db, err := sql.Open("postgres", *cfg.DBUrl)
-	 // important to avoid leaking connections
 	if err != nil {
 		logger.GetLogger().Fatalf("Unable to connect to database: %v", err)
 	}
-	// Create migration instance
+
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
 		logger.GetLogger().Fatal(err)
 	}
 
-	// Point to your migration files. Here we're using local files, but it could be other sources.
 	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
 	if err != nil {
 		logger.GetLogger().Fatal(err)
