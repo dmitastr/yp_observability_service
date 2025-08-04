@@ -192,7 +192,7 @@ func (agent *Agent) SendMetricsBatch() error {
 	}
 	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
-	postPath := agent.address + "/updates"
+	postPath := agent.address + "/updates/"
 	if resp, err := agent.Post(postPath, data, true); err != nil {
 		if resp != nil {
 			resp.Body.Close()

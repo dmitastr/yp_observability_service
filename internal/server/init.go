@@ -57,7 +57,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
 		r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
 	})
 
-	router.Post(`/updates`, metricBatchHandler.ServeHTTP)
+	router.Post(`/updates/`, metricBatchHandler.ServeHTTP)
 
 	router.Route(`/value`, func(r chi.Router) {
 		r.Post(`/`, getMetricHandler.ServeHTTP)
