@@ -183,14 +183,38 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
+func (agent *Agent) SendMetricsBatch() error {
+	metrics := agent.toList()
+	
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
+
+	postPath := agent.address + "/updates"
+	if resp, err := agent.Post(postPath, data, true); err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return err
+	}
+	return nil
+}
+
+func (agent *Agent) toList() (metrics []metric.Metric) {
+	for _, metric := range agent.Metrics {
+		metrics = append(metrics, metric)
+	}
+	return
+}
+
 func (agent *Agent) SendData(reportInterval int) {
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		for ID := range agent.Metrics {
-			if err := agent.SendMetric(ID); err != nil {
-				logger.GetLogger().Error(err)
-			}
+		if err := agent.SendMetricsBatch(); err != nil {
+			logger.GetLogger().Error(err)
 		}
 	}
 }

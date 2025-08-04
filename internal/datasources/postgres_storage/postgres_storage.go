@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -25,10 +24,7 @@ type Postgres struct {
 	db *pgxpool.Pool
 }
 
-var (
-	pgInstance *Postgres
-	pgOnce     sync.Once
-)
+var pgInstance *Postgres
 
 const query string = `INSERT INTO metrics (name, mtype, value, delta) 
 	VALUES (@name, @mtype, @value, @delta)
@@ -69,7 +65,7 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	}
 	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
 		Logger:   logger.GetLogger(),
-		LogLevel: tracelog.LogLevelDebug,
+		LogLevel: tracelog.LogLevelError,
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
