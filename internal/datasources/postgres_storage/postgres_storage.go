@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 
@@ -32,7 +31,6 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
     value = @value,
     delta = @delta `
 
-	
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	db, err := sql.Open("postgres", *cfg.DBUrl)
 	if err != nil {
@@ -109,7 +107,7 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 		return fmt.Errorf("unable to start transaction: %w", err)
 	}
 	defer func() {
-		_ = tx.Rollback(ctx) 
+		_ = tx.Rollback(ctx)
 	}()
 
 	batch := &pgx.Batch{}
@@ -118,7 +116,7 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 		batch.Queue(query, args)
 	}
 	br := tx.SendBatch(ctx, batch)
-	
+
 	for range metrics {
 		_, err := br.Exec()
 		if err != nil {
@@ -128,7 +126,7 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 	if err := br.Close(); err != nil {
 		return fmt.Errorf("failed to close batch results: %w", err)
 	}
-	
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
@@ -137,23 +135,14 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 }
 
 func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
+	var metric models.Metrics
 	query := `SELECT name, mtype, value, delta FROM metrics WHERE name=@name`
 
-	rows, err := pg.db.Query(ctx, query, pgx.NamedArgs{"name": name})
+	err := pg.db.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
 	if err != nil {
-		logger.GetLogger().Errorf("unable to query users: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to query users: %v", err)
 	}
-	defer rows.Close()
-
-	metrics, err := pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
-	if err != nil {
-		return nil, err
-	}
-	if len(metrics) > 1 {
-		return &metrics[0], nil
-	}
-	return nil, errs.ErrorMetricDoesNotExist
+	return &metric, nil
 }
 
 func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
