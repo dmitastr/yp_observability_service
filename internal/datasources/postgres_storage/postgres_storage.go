@@ -29,7 +29,7 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
 	VALUES (@name, @mtype, @value, @delta)
 	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET
     value = @value,
-    delta = @delta `
+    delta = delta + @delta`
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	db, err := sql.Open("postgres", *cfg.DBUrl)
@@ -140,7 +140,7 @@ func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, erro
 
 	err := pg.db.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query users: %v", err)
+		return nil, fmt.Errorf("unable to query metrics: %v", err)
 	}
 	return &metric, nil
 }
