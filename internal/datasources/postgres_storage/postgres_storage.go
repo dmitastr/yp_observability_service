@@ -26,10 +26,10 @@ type Postgres struct {
 var pgInstance *Postgres
 
 const query string = `INSERT INTO metrics (name, mtype, value, delta) 
-	VALUES (@name, @mtype, @value, @delta)
-	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET
-    value = @value,
-    delta = delta + @delta`
+	VALUES (@name, @mtype, @value, @delta) 
+	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET 
+	value = @value, 
+    delta = metrics.delta + @delta `
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	db, err := sql.Open("postgres", *cfg.DBUrl)
@@ -61,7 +61,7 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	}
 	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
 		Logger:   logger.GetLogger(),
-		LogLevel: tracelog.LogLevelError,
+		LogLevel: tracelog.LogLevelDebug,
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
