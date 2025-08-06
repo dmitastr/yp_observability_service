@@ -31,3 +31,6 @@ Taskfile.yml
 # include only folder
 data/*
 !data/.gitkeep 
+
+# Files for sending request
+.rest

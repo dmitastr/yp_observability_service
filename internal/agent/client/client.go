@@ -14,6 +14,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
@@ -51,17 +52,25 @@ const (
 
 type Agent struct {
 	Metrics map[string]metric.Metric
-	Client  http.Client
+	Client  *retryablehttp.Client
 	address string
 }
 
 func NewAgent(address string) *Agent {
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Millisecond * 300
+	client.RetryMax = 3
+	client.Backoff = func(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+		return time.Second * time.Duration(2*attemptNum+1)
+	}
+
 	if !strings.Contains(address, "http") {
 		address = "http://" + address
 	}
+
 	agent := Agent{
 		Metrics: make(map[string]metric.Metric),
-		Client:  http.Client{},
+		Client:  client,
 		address: address,
 	}
 	return &agent
@@ -146,7 +155,7 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 		}
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, &postData)
+	req, err := retryablehttp.NewRequest(http.MethodPost, url, &postData)
 	if err != nil {
 		return
 	}
@@ -185,7 +194,7 @@ func (agent *Agent) SendMetric(key string) error {
 
 func (agent *Agent) SendMetricsBatch() error {
 	metrics := agent.toList()
-	
+
 	data, err := json.Marshal(metrics)
 	if err != nil {
 		return err
