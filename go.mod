@@ -29,7 +29,9 @@ require (
 require (
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/failsafe-go/failsafe-go v0.6.9
 	github.com/hashicorp/go-retryablehttp v0.7.8
+	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
