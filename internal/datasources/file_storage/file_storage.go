@@ -19,8 +19,7 @@ func New(cfg serverenvconfig.Config) *FileStorage {
 }
 
 
-
-func (fs *FileStorage) CreateFile() *os.File {
+func (fs *FileStorage) createFile() *os.File {
 	file, err := os.Create(fs.FileName)
 	if err != nil {
 		logger.GetLogger().Infof("error while creating file '%s': %v", fs.FileName, err)
@@ -28,16 +27,9 @@ func (fs *FileStorage) CreateFile() *os.File {
 	return file
 }
 
-func (fs *FileStorage) OpenFile() *os.File {
-	file, err := os.Open(fs.FileName)
-	if err != nil {
-		logger.GetLogger().Infof("error while opening file '%s': %v", fs.FileName, err)
-	}
-	return file
-}
-
 func (fs *FileStorage) Flush(metrics []models.Metrics) error {
-	file := fs.CreateFile()
+	file := fs.createFile()
+	defer file.Close()
 	if err := json.NewEncoder(file).Encode(metrics); err != nil {
 		logger.GetLogger().Error(err)
 		return err
@@ -51,9 +43,10 @@ func (fs *FileStorage) Load() (metrics []models.Metrics, err error) {
 		logger.GetLogger().Infof("error while opening file '%s': %s", fs.FileName, err)
 		return 
 	}
+	defer file.Close()
 
 	if err = json.NewDecoder(file).Decode(&metrics); err != nil {
-		logger.GetLogger().Fatal(err)
+		logger.GetLogger().Error(err)
 		return 
 	}
 	return 
