@@ -30,6 +30,11 @@ type Conn interface {
 	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
 }
 
+type Cursor interface {
+	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
+}
+
 var maxErrorRetries int = 3
 var delaySlope int = 2
 var delayRise int = 1
@@ -140,7 +145,7 @@ func (pg *Postgres) ExecuteTX(ctx context.Context, conn Conn, fnc ExecuteWithRet
 		})
 }
 
-func (pg *Postgres) UpdateTx(ctx context.Context, metric models.Metrics) error {
+func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 	fun := func(tx pgx.Tx) error {
 		args := metric.ToNamedArgs()
 
@@ -154,7 +159,7 @@ func (pg *Postgres) UpdateTx(ctx context.Context, metric models.Metrics) error {
 	return pg.ExecuteTX(ctx, pg.db, fun)
 }
 
-func (pg *Postgres) BulkUpdateTx(ctx context.Context, metrics []models.Metrics) error {
+func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
 	fun := func(tx pgx.Tx) error {
 		batch := &pgx.Batch{}
 		for _, metric := range metrics {
@@ -177,105 +182,60 @@ func (pg *Postgres) BulkUpdateTx(ctx context.Context, metrics []models.Metrics) 
 	return pg.ExecuteTX(ctx, pg.db, fun)
 }
 
-func (pg *Postgres) GetTx(ctx context.Context, name string) (*models.Metrics, error) {
+func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
 	var metric *models.Metrics
 
 	fun := func(tx pgx.Tx) error {
-		query := `SELECT name, mtype, value, delta FROM metrics WHERE name=@name`
-	
-		err := tx.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
-		if err != nil {
+		m, err := pg.getWithinTx(ctx, name, tx)
+			if err != nil {
 			return fmt.Errorf("unable to query metrics: %w", err)
 		}
+		metric = m
 		return nil
 	}
 	err := pg.ExecuteTX(ctx, pg.db, fun)
 	return metric, err
 }
 
-func (pg *Postgres) GetAllTx(ctx context.Context) ([]models.Metrics, error) {
+func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	var metrics []models.Metrics
 	fun := func(tx pgx.Tx) error {
-		query := `SELECT name, mtype, value, delta FROM metrics`
-	
-		rows, err := tx.Query(ctx, query)
+		m, err := pg.getAllWithinTx(ctx, tx)
 		if err != nil {
 			return fmt.Errorf("unable to query users: %w", err)
 		}
-		defer rows.Close()
-
-		metrics, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
+		metrics = m
 		return err
 	}
 	err := pg.ExecuteTX(ctx, pg.db, fun)
 	return metrics, err
 }
 
-func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
-	tx, err := pg.db.Begin(ctx)
-	if err != nil {
-		return err
+
+
+func (pg *Postgres) getWithinTx(ctx context.Context, name string, conn Cursor) (*models.Metrics, error) {
+	if conn == nil {
+		conn = pg.db
 	}
 
-	args := metric.ToNamedArgs()
-
-	if _, err := tx.Exec(ctx, query, args); err != nil {
-		tx.Rollback(ctx)
-		logger.GetLogger().Errorf("unable to insert row: %v", err)
-		return err
-	}
-
-	return tx.Commit(ctx)
-}
-
-func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
-	tx, err := pg.db.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to start transaction: %w", err)
-	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-
-	batch := &pgx.Batch{}
-	for _, metric := range metrics {
-		args := metric.ToNamedArgs()
-		batch.Queue(query, args)
-	}
-	br := tx.SendBatch(ctx, batch)
-
-	for range metrics {
-		_, err := br.Exec()
-		if err != nil {
-			return fmt.Errorf("batch exec failed at item: %w", err)
-		}
-	}
-	if err := br.Close(); err != nil {
-		return fmt.Errorf("failed to close batch results: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit failed: %w", err)
-	}
-
-	return nil
-}
-
-func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
 	var metric models.Metrics
 	query := `SELECT name, mtype, value, delta FROM metrics WHERE name=@name`
 
-	err := pg.db.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
+	err := conn.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query metrics: %v", err)
 	}
 	return &metric, nil
 }
 
-func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
+func (pg *Postgres) getAllWithinTx(ctx context.Context, conn Cursor) ([]models.Metrics, error) {
+	if conn == nil {
+		conn = pg.db
+	}
+	
 	query := `SELECT name, mtype, value, delta FROM metrics`
 
-	rows, err := pg.db.Query(ctx, query)
+	rows, err := conn.Query(ctx, query)
 	if err != nil {
 		logger.GetLogger().Errorf("unable to query users: %v", err)
 		return nil, err
