@@ -49,8 +49,6 @@ type Postgres struct {
 	retryPolicy retrypolicy.RetryPolicy[any]
 }
 
-var pgInstance *Postgres
-
 const query string = `INSERT INTO metrics (name, mtype, value, delta) 
 	VALUES (@name, @mtype, @value, @delta) 
 	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET 
