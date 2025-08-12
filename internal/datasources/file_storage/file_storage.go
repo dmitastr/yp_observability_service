@@ -8,7 +8,6 @@ import (
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
-	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
 )
 
 type FileStorage struct {
@@ -16,7 +15,7 @@ type FileStorage struct {
 	FileName      string
 }
 
-func New(cfg serverenvconfig.Config, db dbinterface.Database) *FileStorage {
+func New(cfg serverenvconfig.Config) *FileStorage {
 	return &FileStorage{StoreInterval: *cfg.StoreInterval, FileName: *cfg.FileStoragePath}
 }
 
@@ -37,7 +36,7 @@ func (fs *FileStorage) RunBackup(fnc func() []models.Metrics) {
 func (fs *FileStorage) createFile() *os.File {
 	file, err := os.Create(fs.FileName)
 	if err != nil {
-		logger.GetLogger().Infof("error while creating file '%s': %v", fs.FileName, err)
+		logger.GetLogger().Errorf("error while creating file '%s': %v", fs.FileName, err)
 	}
 	return file
 }

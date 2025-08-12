@@ -63,7 +63,7 @@ func (storage *Storage) Init() error {
 	}
 
 	if !storage.StreamWrite {
-		go storage.BackupManager.RunBackup(storage.toList)
+		storage.BackupManager.RunBackup(storage.toList)
 	}
 
 	return nil

@@ -25,16 +25,16 @@ import (
 func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	var storage dbinterface.Database
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
-		fileStorage := filestorage.New(cfg, storage)
+		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
 		
-		} else {
-			var err error
-			storage, err = postgresstorage.NewPG(context.TODO(), cfg)
-			if err != nil {
-				logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
-			}
+	} else {
+		var err error
+		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
+		if err != nil {
+			logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
 		}
+	}
 	storage.Init()
 
 	pinger := postgrespinger.New()
