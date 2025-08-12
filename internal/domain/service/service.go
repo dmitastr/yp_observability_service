@@ -9,15 +9,17 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
-	"github.com/dmitastr/yp_observability_service/internal/repository"
+	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
+	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 )
 
 type Service struct {
-	db   repository.Database
+	db     dbinterface.Database
+	pinger pinger.Pinger
 }
 
-func NewService(db repository.Database) *Service {
-	return &Service{db: db}
+func NewService(db dbinterface.Database, pinger pinger.Pinger) *Service {
+	return &Service{db: db, pinger: pinger}
 }
 
 func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
@@ -66,5 +68,5 @@ func (service Service) GetAll(ctx context.Context) (metricLst []entity.DisplayMe
 }
 
 func (service Service) Ping(ctx context.Context) error {
-	return service.db.Ping(ctx)
+	return service.pinger.Ping(ctx, service.db)
 }

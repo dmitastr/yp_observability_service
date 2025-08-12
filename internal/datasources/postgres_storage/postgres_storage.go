@@ -56,7 +56,39 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
     delta = metrics.delta + @delta `
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
-	db, err := sql.Open("postgres", *cfg.DBUrl)
+	
+	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
+	if err != nil {
+		logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
+	}
+	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
+		Logger:   logger.GetLogger(),
+		LogLevel: tracelog.LogLevelInfo,
+	}
+	
+	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
+	}
+	logger.GetLogger().Info("Database connection established successfully")
+	
+	delayFunc := func(exec failsafe.ExecutionAttempt[any]) time.Duration {
+		return linearBackOff(exec.Attempts(), delaySlope, delayRise)
+	}
+	retry := retrypolicy.Builder[any]().HandleIf(func(_ any, err error) bool {
+		pgerrClassifier := pgerrors.NewPostgresErrorClassifier()
+		return pgerrClassifier.Classify(err) == pgerrors.Retriable
+		
+		}).WithMaxRetries(maxErrorRetries).
+		WithDelayFunc(delayFunc).Build()
+		
+		pg := &Postgres{db: pool, retryPolicy: retry}
+		
+		return pg, nil
+	}
+	
+func (pg *Postgres) Init() error {
+	db, err := sql.Open("postgres", pg.db.Config().ConnString())
 	if err != nil {
 		logger.GetLogger().Fatalf("Unable to connect to database: %v", err)
 	}
@@ -75,40 +107,13 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 		logger.GetLogger().Fatalf("Migration up failed: %v", err)
 	}
 	if err := db.Close(); err != nil {
-		return nil, err
+		return err
 	}
 	logger.GetLogger().Info("Migration up completed successfully")
-
-	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
-	if err != nil {
-		logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
-	}
-	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
-		Logger:   logger.GetLogger(),
-		LogLevel: tracelog.LogLevelInfo,
-	}
-
-	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
-	}
-	logger.GetLogger().Info("Database connection established successfully")
-
-	delayFunc := func(exec failsafe.ExecutionAttempt[any]) time.Duration {
-		return linearBackOff(exec.Attempts(), delaySlope, delayRise)
-	}
-	retry := retrypolicy.Builder[any]().HandleIf(func(_ any, err error) bool {
-		pgerrClassifier := pgerrors.NewPostgresErrorClassifier()
-		return pgerrClassifier.Classify(err) == pgerrors.Retriable
-
-	}).WithMaxRetries(maxErrorRetries).
-		WithDelayFunc(delayFunc).Build()
-
-	pgInstance = &Postgres{db: pool, retryPolicy: retry}
-
-	return pgInstance, nil
+	return nil
+	
 }
-
+	
 func (pg *Postgres) Ping(ctx context.Context) error {
 	return pg.db.Ping(ctx)
 }
@@ -242,6 +247,3 @@ func (pg *Postgres) getAllWithinTx(ctx context.Context, conn Cursor) ([]models.M
 
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
 }
-
-// dummy function to satisfy interface
-func (pg *Postgres) RunBackup() {}

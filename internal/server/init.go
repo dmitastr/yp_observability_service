@@ -7,7 +7,9 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
+	filestorage "github.com/dmitastr/yp_observability_service/internal/datasources/file_storage"
 	postgresstorage "github.com/dmitastr/yp_observability_service/internal/datasources/postgres_storage"
+	postgrespinger "github.com/dmitastr/yp_observability_service/internal/domain/postgres_pinger"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
@@ -17,23 +19,27 @@ import (
 	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
-	"github.com/dmitastr/yp_observability_service/internal/repository"
+	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
 )
 
-func NewServer(cfg serverenvconfig.Config) (*chi.Mux, repository.Database) {
-	var storage repository.Database
+func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
+	var storage dbinterface.Database
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
-		storage = db.NewStorage(cfg)
-		storage.RunBackup()
-	} else {
-		var err error
-		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
-		if err != nil {
-			logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+		fileStorage := filestorage.New(cfg, storage)
+		storage = db.NewStorage(cfg, fileStorage)
+		
+		} else {
+			var err error
+			storage, err = postgresstorage.NewPG(context.TODO(), cfg)
+			if err != nil {
+				logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+			}
 		}
-	}
+	storage.Init()
 
-	service := service.NewService(storage)
+	pinger := postgrespinger.New()
+		
+	service := service.NewService(storage, pinger)
 
 	metricHandler := updatemetric.NewHandler(service)
 	metricBatchHandler := updatemetricsbatch.NewHandler(service)

@@ -1,4 +1,4 @@
-package repository
+package database
 
 import (
 	"context"
@@ -12,6 +12,7 @@ type Database interface {
 	GetAll(context.Context) ([]models.Metrics, error)
 	Get(context.Context, string) (*models.Metrics, error)
 	Close() error
+	Init() error
 	Ping(context.Context) error
-	RunBackup()
 }
+
