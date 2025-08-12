@@ -55,7 +55,7 @@ func (fs *FileStorage) Load() (metrics []models.Metrics, err error) {
 	file, err := os.Open(fs.FileName)
 	if err != nil {
 		logger.GetLogger().Infof("error while opening file '%s': %s", fs.FileName, err)
-		return
+		return metrics, err
 	}
 	defer file.Close()
 

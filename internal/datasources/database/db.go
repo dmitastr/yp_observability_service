@@ -54,16 +54,16 @@ func NewStorage(cfg serverenvconfig.Config, bm backupmanager.BackupManager) *Sto
 }
 
 func (storage *Storage) Init() error {
+	if !storage.StreamWrite {
+		storage.BackupManager.RunBackup(storage.toList)
+	}
+
 	if storage.Restore {
 		metrics, err := storage.BackupManager.Load()
 		if err != nil {
 			return fmt.Errorf("error loading metrics from file backup: %w", err)
 		}
 		storage.Metrics = storage.fromList(metrics)
-	}
-
-	if !storage.StreamWrite {
-		storage.BackupManager.RunBackup(storage.toList)
 	}
 
 	return nil
