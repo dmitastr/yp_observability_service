@@ -1,8 +1,10 @@
 package updatemetric
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
@@ -45,10 +47,14 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	err = handler.service.ProcessUpdate(upd)
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+
+	err = handler.service.ProcessUpdate(ctx, upd)
 
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		res.WriteHeader(http.StatusBadRequest)
+		res.Write([]byte(err.Error()))
 		return
 	}
 

@@ -1,18 +1,18 @@
-package listmetric
+package updatemetricsbatch
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 	"github.com/dmitastr/yp_observability_service/internal/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
-func TestListMetricsHandler_ServeHTTP(t *testing.T) {
-	metrics := []entity.DisplayMetric{{Name: "abc", Type: "gauge", StringValue: "10"}}
+
+func TestBatchUpdateHandler_ServeHTTP(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -22,61 +22,75 @@ func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 		}
 		return
 	}
-	
+
+	type pathParam struct {
+		key   string
+		value string
+	}
+
 	tests := []struct {
 		name          string
 		method        string
 		url           string
 		wantCode      int
-		wantContent   []string
+		payload       []byte
 		serviceErrOut bool
 	}{
 		{
 			name:     "Valid request",
-			method:   http.MethodGet,
-			url:      "/",
-			wantCode: http.StatusOK,
-			serviceErrOut: false,
-			wantContent: []string{"Name", "Metrics", "Value"},
-		},
-		{
-			name:     "POST method",
 			method:   http.MethodPost,
-			url:      "/",
-			wantCode: http.StatusMethodNotAllowed,
+			url:      "/updates",
+			wantCode: http.StatusOK,
+			payload: []byte(`[{
+				"id": "abc",
+				"type": "gauge",
+				"value": 1.99
+			},{
+				"id": "sdf",
+				"type": "counter",
+				"delta": 1111
+			}]`),
 			serviceErrOut: false,
-			wantContent: []string{},
 		},
 		{
-			name:     "service returned an error",
-			method:   http.MethodGet,
-			url:      "/",
-			wantCode: http.StatusInternalServerError,
+			name:     "bad payload",
+			method:   http.MethodPost,
+			url:      "/updates",
+			wantCode: http.StatusBadRequest,
+			payload: []byte(`{
+				"id": "abc",
+				"type": "gauge",
+				"value": 1.99
+			}`),
 			serviceErrOut: true,
-			wantContent: []string{},
+		},
+		{
+			name:     "server returned an error",
+			method:   http.MethodPost,
+			url:      "/updates",
+			wantCode: http.StatusInternalServerError,
+			payload: []byte(`[{
+				"id": "abc",
+				"type": "gauge",
+				"value": 1.99
+			}]`),
+			serviceErrOut: true,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBuffer(tt.payload))
+			
 			mockSrv := mocks.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
-			mockSrv.EXPECT().GetAll(gomock.Any()).Return(metrics, errValue).AnyTimes()
+
+			mockSrv.EXPECT().BatchUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
 
 			handler := NewHandler(mockSrv)
 
-			req := httptest.NewRequest(tt.method, tt.url, nil)
 			rr := httptest.NewRecorder()
-
 			handler.ServeHTTP(rr, req)
 			assert.Equal(t, tt.wantCode, rr.Code)
-
-			if rr.Code == http.StatusOK {
-				bodyBytes := rr.Body.String()
-				for _, substr := range tt.wantContent {
-					assert.Contains(t, bodyBytes, substr)
-				}
-			}
 		})
 	}
 }

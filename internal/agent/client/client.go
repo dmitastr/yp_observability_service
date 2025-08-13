@@ -14,6 +14,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
@@ -51,17 +52,25 @@ const (
 
 type Agent struct {
 	Metrics map[string]metric.Metric
-	Client  http.Client
+	Client  *retryablehttp.Client
 	address string
 }
 
 func NewAgent(address string) *Agent {
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Millisecond * 300
+	client.RetryMax = 3
+	client.Backoff = func(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+		return time.Second * time.Duration(2*attemptNum+1)
+	}
+
 	if !strings.Contains(address, "http") {
 		address = "http://" + address
 	}
+
 	agent := Agent{
 		Metrics: make(map[string]metric.Metric),
-		Client:  http.Client{},
+		Client:  client,
 		address: address,
 	}
 	return &agent
@@ -136,17 +145,17 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 			return nil, err
 		}
 		if err := gw.Close(); err != nil {
-			logger.GetLogger().Errorf("failed to close gzip writer: %w", err)
+			logger.GetLogger().Errorf("failed to close gzip writer: %v", err)
 		}
 		compression = "gzip"
 	} else {
 		if _, err := postData.Write(data); err != nil {
-			logger.GetLogger().Errorf("failed to write uncompressed: %w", err)
+			logger.GetLogger().Errorf("failed to write uncompressed: %v", err)
 			return nil, err
 		}
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, &postData)
+	req, err := retryablehttp.NewRequest(http.MethodPost, url, &postData)
 	if err != nil {
 		return
 	}
@@ -183,14 +192,38 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
+func (agent *Agent) SendMetricsBatch() error {
+	metrics := agent.toList()
+
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
+
+	postPath := agent.address + "/updates/"
+	if resp, err := agent.Post(postPath, data, true); err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return err
+	}
+	return nil
+}
+
+func (agent *Agent) toList() (metrics []metric.Metric) {
+	for _, metric := range agent.Metrics {
+		metrics = append(metrics, metric)
+	}
+	return
+}
+
 func (agent *Agent) SendData(reportInterval int) {
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		for ID := range agent.Metrics {
-			if err := agent.SendMetric(ID); err != nil {
-				logger.GetLogger().Error(err)
-			}
+		if err := agent.SendMetricsBatch(); err != nil {
+			logger.GetLogger().Error(err)
 		}
 	}
 }

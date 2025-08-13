@@ -1,15 +1,28 @@
 package updatemetric
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	_ "github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/dmitastr/yp_observability_service/internal/domain/mock_service"
 )
 
 func TestMetricHandler_ServeHTTP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	errFunc := func(serviceErrOut bool) (err error) {
+		if serviceErrOut {
+			err = errors.New("mocked error")
+		}
+		return
+	}
+	
 
 	type pathParam struct {
 		key   string
@@ -75,10 +88,15 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSrv := mockservice.MockService{WantErr: tt.serviceErrOut}
-			handler := NewHandler(mockSrv)
-
 			req := httptest.NewRequest(tt.method, tt.url, nil)
+
+			mockSrv := mocks.NewMockServiceAbstract(ctrl)
+			errValue := errFunc(tt.serviceErrOut)
+
+			mockSrv.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
+			
+			handler := NewHandler(mockSrv)
+			
 			rr := httptest.NewRecorder()
 			for _, pp := range tt.pathParams {
 				req.SetPathValue(pp.key, pp.value)

@@ -1,12 +1,15 @@
 package database
 
 import (
-	"encoding/json"
-	"os"
+	"context"
+	"fmt"
 	"sync"
 
+	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
+	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
+	backupmanager "github.com/dmitastr/yp_observability_service/internal/repository/backup_manager"
 )
 
 type MetricEntity struct {
@@ -33,69 +36,36 @@ func ModelToEntity(metric models.Metrics) MetricEntity {
 
 type Storage struct {
 	sync.Mutex
-	Metrics map[string]models.Metrics
-	FileName    string
-	StreamWrite bool
+	Metrics       map[string]models.Metrics
+	BackupManager backupmanager.BackupManager
+	StreamWrite   bool
+	Restore       bool
 }
 
-func NewStorage(fname string, storeInterval int, restore bool) *Storage {
-	storage := Storage{FileName: fname, Metrics: make(map[string]models.Metrics)}
-	if storeInterval == 0 {
+func NewStorage(cfg serverenvconfig.Config, bm backupmanager.BackupManager) *Storage {
+	storage := Storage{Metrics: make(map[string]models.Metrics)}
+	if *cfg.StoreInterval == 0 {
 		storage.StreamWrite = true
 	}
-
-	if restore {
-		err := storage.Load()
-		if err != nil {
-			logger.GetLogger().Error(err)
-		}
-	}
+	storage.Restore = *cfg.Restore
+	storage.BackupManager = bm
 
 	return &storage
 }
 
-func (storage *Storage) CreateFile() *os.File {
-	file, err := os.Create(storage.FileName)
-	if err != nil {
-		logger.GetLogger().Panicf("error while creating file '%s': %s", storage.FileName, err)
-	}
-	return file
-}
-
-func (storage *Storage) OpenFile() *os.File {
-	file, err := os.Open(storage.FileName)
-	if err != nil {
-		logger.GetLogger().Panicf("error while opening file '%s': %s", storage.FileName, err)
-	}
-	return file
-}
-
-func (storage *Storage) Flush() error {
-	storage.Lock()
-	defer storage.Unlock()
-	file := storage.CreateFile()
-	if err := json.NewEncoder(file).Encode(storage.toList()); err != nil {
-		logger.GetLogger().Error(err)
-		return err
-	}
-	return nil
-}
-
-func (storage *Storage) Load() error {
-	storage.Lock()
-	defer storage.Unlock()
-	file, err := os.Open(storage.FileName)
-	if err != nil {
-		logger.GetLogger().Error("error while opening file '%s': %s", storage.FileName, err)
-		return err
+func (storage *Storage) Init() error {
+	if !storage.StreamWrite {
+		storage.BackupManager.RunBackup(storage.toList)
 	}
 
-	metrics := make([]models.Metrics, 0)
-	if err := json.NewDecoder(file).Decode(&metrics); err != nil {
-		logger.GetLogger().Fatal(err)
-		return err
+	if storage.Restore {
+		metrics, err := storage.BackupManager.Load()
+		if err != nil {
+			return fmt.Errorf("error loading metrics from file backup: %w", err)
+		}
+		storage.Metrics = storage.fromList(metrics)
 	}
-	storage.Metrics = storage.fromList(metrics)
+
 	return nil
 }
 
@@ -107,7 +77,7 @@ func (storage *Storage) fromList(metrics []models.Metrics) map[string]models.Met
 	return mapping
 }
 
-func (storage *Storage) Update(newMetric models.Metrics) {
+func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) error {
 	logger.GetLogger().Infof("Get new data: %s", newMetric.String())
 	storage.Lock()
 	defer storage.Unlock()
@@ -118,22 +88,43 @@ func (storage *Storage) Update(newMetric models.Metrics) {
 	}
 	storage.Metrics[newMetric.ID] = newMetric
 	if storage.StreamWrite {
-		if err := storage.Flush(); err != nil {
+		metrics := storage.toList()
+		if err := storage.BackupManager.Flush(metrics); err != nil {
 			logger.GetLogger().Error(err)
 		}
 	}
+	return nil
 }
 
-func (storage *Storage) GetAll() []models.Metrics {
-	return storage.toList()
-}
+func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
+	logger.GetLogger().Infof("Get %d new metrics", len(metrics))
+	for _, metric := range metrics {
+		err := storage.Update(ctx, metric)
+		if err != nil {
+			return err
+		}
+	}
 
-func (storage *Storage) Get(key string) *models.Metrics {
-	if metric, ok := storage.Metrics[key]; ok {
-		logger.GetLogger().Infof("Found metric: %s", metric)
-		return &metric
+	if storage.StreamWrite {
+		metrics := storage.toList()
+		if err := storage.BackupManager.Flush(metrics); err != nil {
+			return err
+		}
+		
 	}
 	return nil
+}
+
+func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
+	return storage.toList(), nil
+}
+
+func (storage *Storage) Get(ctx context.Context, key string) (*models.Metrics, error) {
+	if metric, ok := storage.Metrics[key]; ok {
+		logger.GetLogger().Infof("Found metric: %s", metric)
+		return &metric, nil
+	}
+	return nil, errs.ErrorMetricDoesNotExist
 }
 
 func (storage *Storage) toList() (lst []models.Metrics) {
@@ -144,5 +135,13 @@ func (storage *Storage) toList() (lst []models.Metrics) {
 }
 
 func (storage *Storage) Close() error {
-	return storage.Flush()
+	metrics := storage.toList()
+	if err := storage.BackupManager.Flush(metrics); err != nil {
+		return fmt.Errorf("error saving metrics to file backup: %w", err)
+	}
+	return nil
+}
+
+func (storage *Storage) Ping(ctx context.Context) error {
+	return nil
 }

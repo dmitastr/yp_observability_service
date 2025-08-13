@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"slices"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
@@ -8,35 +9,48 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
-	"github.com/dmitastr/yp_observability_service/internal/repository"
+	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
+	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 )
 
-
 type Service struct {
-	db repository.Database
+	db     dbinterface.Database
+	pinger pinger.Pinger
 }
 
-func NewService(db repository.Database) *Service {
-	return &Service{db: db}
+func NewService(db dbinterface.Database, pinger pinger.Pinger) *Service {
+	return &Service{db: db, pinger: pinger}
 }
 
-func (service Service) ProcessUpdate(upd update.MetricUpdate) error {
+func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
 	logger.GetLogger().Infof("Processing update: %s", upd)
 	metric := models.FromUpdate(upd)
-	service.db.Update(metric)
-	return nil	
+	err := service.db.Update(ctx, metric)
+	return err
 }
 
-func (service Service) GetMetric(upd update.MetricUpdate) (metric *models.Metrics, err error) {
-	metric = service.db.Get(upd.MetricName)
+func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics) error {
+	return service.db.BulkUpdate(ctx, metrics)
+}
+
+func (service Service) GetMetric(ctx context.Context, upd update.MetricUpdate) (metric *models.Metrics, err error) {
+	metric, err = service.db.Get(ctx, upd.MetricName)
+	if err != nil {
+		return nil, err
+	}
+
 	if metric == nil {
 		err = errs.ErrorMetricDoesNotExist
 	}
 	return metric, err
 }
 
-func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
-	metricDB := service.db.GetAll()
+func (service Service) GetAll(ctx context.Context) (metricLst []entity.DisplayMetric, err error) {
+	metricDB, err := service.db.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, m := range metricDB {
 		md := entity.ModelToDisplay(m)
 		metricLst = append(metricLst, md)
@@ -51,4 +65,8 @@ func (service Service) GetAll() (metricLst []entity.DisplayMetric, err error) {
 		return -1
 	})
 	return metricLst, err
+}
+
+func (service Service) Ping(ctx context.Context) error {
+	return service.pinger.Ping(ctx, service.db)
 }

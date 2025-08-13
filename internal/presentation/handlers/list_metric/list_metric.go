@@ -1,11 +1,13 @@
 package listmetric
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
@@ -27,7 +29,10 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	}
 	res.Header().Set("Content-Type", "text/html")
 
-	metrics, err := handler.service.GetAll()
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	
+	metrics, err := handler.service.GetAll(ctx)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
