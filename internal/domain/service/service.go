@@ -5,12 +5,12 @@ import (
 	"slices"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
+	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
-	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 )
 
 type Service struct {
