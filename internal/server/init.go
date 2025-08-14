@@ -37,7 +37,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
 		if err != nil {
-			logger.GetLogger().Panicf("couldn't connect to postgres database: %v", err)
+			logger.GetLogger().Errorf("couldn't connect to postgres database: %v", err)
 		}
 	}
 	if err := storage.Init(); err != nil {
