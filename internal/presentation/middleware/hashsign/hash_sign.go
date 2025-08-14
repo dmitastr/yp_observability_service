@@ -1,4 +1,4 @@
-package hash_sign
+package hashsign
 
 import (
 	"crypto/hmac"

@@ -23,7 +23,7 @@ import (
 	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
 
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
-	hashsign "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash_sign"
+	hashsign "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hashsign"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 

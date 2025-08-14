@@ -16,7 +16,7 @@ import (
 	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash_sign"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hashsign"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -57,7 +57,7 @@ type Agent struct {
 	Metrics map[string]model.Metric
 	Client  *retryablehttp.Client
 	address string
-	hasher  *hash_sign.HashGenerator
+	hasher  *hashsign.HashGenerator
 }
 
 func NewAgent(cfg agentenvconfig.Config) *Agent {
@@ -77,7 +77,7 @@ func NewAgent(cfg agentenvconfig.Config) *Agent {
 		Metrics: make(map[string]model.Metric),
 		Client:  client,
 		address: address,
-		hasher:  hash_sign.NewHashGenerator(cfg.Key),
+		hasher:  hashsign.NewHashGenerator(cfg.Key),
 	}
 	return &agent
 }

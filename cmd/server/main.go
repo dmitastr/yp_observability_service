@@ -37,7 +37,7 @@ func main() {
 	defer func(db dbinterface.Database) {
 		err := db.Close()
 		if err != nil {
-
+			logger.GetLogger().Fatal(err)
 		}
 	}(db)
 
