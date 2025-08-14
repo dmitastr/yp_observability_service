@@ -128,24 +128,20 @@ func (pg *Postgres) ExecuteTX(ctx context.Context, conn Conn, fnc ExecuteWithRet
 	return failsafe.NewExecutor(pg.retryPolicy).
 		WithContext(ctx).
 		RunWithExecution(func(exec failsafe.Execution[any]) (err error) { //nolint:contextcheck
-			ctx := exec.Context()
-			tx, err := conn.Begin(ctx)
+			ctxTry := exec.Context()
+			tx, err := conn.Begin(ctxTry)
 			if err != nil {
 				return fmt.Errorf("failed to begin tx: %w", err)
 			}
-
-			defer func(tx pgx.Tx, ctx context.Context) {
-				err := tx.Rollback(ctx)
-				if err != nil {
-					logger.GetLogger().Fatalf("Failed to rollback tx: %v", err)
-				}
-			}(tx, ctx)
 
 			if err := fnc(tx); err != nil {
 				return err
 			}
 
 			if err := tx.Commit(ctx); err != nil {
+				if err := tx.Rollback(ctx); err != nil {
+					logger.GetLogger().Errorf("Failed to rollback tx: %v", err)
+				}
 				return fmt.Errorf("failed to commit: %w", err)
 			}
 
