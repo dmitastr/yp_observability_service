@@ -57,7 +57,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	router := chi.NewRouter()
 
 	// middleware
-	hashGenerator := hashsign.NewHashGenerator(*cfg.Key)
+	hashGenerator := hashsign.NewHashGenerator(cfg.Key)
 	router.Use(
 		requestlogger.RequestLogger,
 		compress.CompressMiddleware,

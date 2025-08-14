@@ -14,10 +14,10 @@ type HashGenerator struct {
 	Key []byte
 }
 
-func NewHashGenerator(key string) *HashGenerator {
+func NewHashGenerator(key *string) *HashGenerator {
 	h := &HashGenerator{}
-	if key != "" {
-		h.Key = []byte(key)
+	if key != nil {
+		h.Key = []byte(*key)
 	}
 	return h
 }

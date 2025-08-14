@@ -77,7 +77,7 @@ func NewAgent(cfg agentenvconfig.Config) *Agent {
 		Metrics: make(map[string]model.Metric),
 		Client:  client,
 		address: address,
-		hasher:  hash_sign.NewHashGenerator(*cfg.Key),
+		hasher:  hash_sign.NewHashGenerator(cfg.Key),
 	}
 	return &agent
 }
