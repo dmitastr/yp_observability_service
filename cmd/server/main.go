@@ -9,11 +9,14 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
-var ServerAddress string
-var StoreInterval int
-var Restore bool
-var FileStoragePath string
-var DBUrl string
+var (
+	StoreInterval   int
+	Restore         bool
+	FileStoragePath string
+	ServerAddress   string
+	DBUrl           string
+	Key             string
+)
 
 func init() {
 	flag.StringVar(&ServerAddress, "a", "localhost:8080", "set server host and port")
@@ -21,12 +24,13 @@ func init() {
 	flag.BoolVar(&Restore, "r", false, "restore data from file")
 	flag.StringVar(&FileStoragePath, "f", "./data/data.json", "path for writing data")
 	flag.StringVar(&DBUrl, "d", "", "database connection url")
+	flag.StringVar(&Key, "k", "", "key for data signing")
 }
 
 func main() {
 	flag.Parse()
 	logger.Initialize()
-	cfg := serverenvconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore, DBUrl)
+	cfg := serverenvconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore, DBUrl, Key)
 
 	router, db := server.NewServer(cfg)
 	defer db.Close()

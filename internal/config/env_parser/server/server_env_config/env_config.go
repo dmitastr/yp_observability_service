@@ -11,9 +11,10 @@ type Config struct {
 	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool   `env:"RESTORE"`
 	DBUrl           *string `env:"DATABASE_DSN"`
+	Key             *string `env:"KEY"`
 }
 
-func New(address string, storeInterval int, fileStoragePath string, restore bool, dbURL string) (cfg Config) {
+func New(address string, storeInterval int, fileStoragePath string, restore bool, dbURL string, key string) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
 		logger.GetLogger().Errorf("error while reading env variables=%s", err)
@@ -32,6 +33,9 @@ func New(address string, storeInterval int, fileStoragePath string, restore bool
 	}
 	if cfg.DBUrl == nil {
 		cfg.DBUrl = &dbURL
+	}
+	if cfg.Key == nil {
+		cfg.Key = &key
 	}
 	return
 }
