@@ -41,7 +41,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		}
 	}
 	if err := storage.Init(); err != nil {
-		logger.GetLogger().Panicf("error while initializing database: %v", err)
+		logger.GetLogger().Errorf("error while initializing database: %v", err)
 	}
 
 	pinger := postgrespinger.New()
