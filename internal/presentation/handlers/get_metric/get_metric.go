@@ -46,7 +46,7 @@ func (handler Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 	defer cancel()
 	metric, err := handler.service.GetMetric(ctx, upd)
 	if err != nil {

@@ -13,7 +13,6 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
-
 type ListMetricsHandler struct {
 	service srv.ServiceAbstract
 }
@@ -29,16 +28,16 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	}
 	res.Header().Set("Content-Type", "text/html")
 
-	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
 	defer cancel()
-	
+
 	metrics, err := handler.service.GetAll(ctx)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	logger.GetLogger().Infof("Receive %d metrics from db", len(metrics))
-	
+
 	wd, err := os.Getwd()
 	if err != nil {
 		panic(err)
