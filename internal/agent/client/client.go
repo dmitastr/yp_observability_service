@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/hex"
 	"encoding/json"
 	"math/rand"
 	"net/http"
@@ -11,9 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
+	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
+	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash_sign"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -51,12 +54,13 @@ const (
 )
 
 type Agent struct {
-	Metrics map[string]metric.Metric
+	Metrics map[string]model.Metric
 	Client  *retryablehttp.Client
 	address string
+	hasher  *hash_sign.HashGenerator
 }
 
-func NewAgent(address string) *Agent {
+func NewAgent(cfg agentenvconfig.Config) *Agent {
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Timeout = time.Millisecond * 300
 	client.RetryMax = 3
@@ -64,34 +68,42 @@ func NewAgent(address string) *Agent {
 		return time.Second * time.Duration(2*attemptNum+1)
 	}
 
+	address := *cfg.Address
 	if !strings.Contains(address, "http") {
 		address = "http://" + address
 	}
 
 	agent := Agent{
-		Metrics: make(map[string]metric.Metric),
+		Metrics: make(map[string]model.Metric),
 		Client:  client,
 		address: address,
+		hasher:  hash_sign.NewHashGenerator(*cfg.Key),
 	}
 	return &agent
 }
 
 func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
 	if _, ok := agent.Metrics[key]; !ok {
-		pc := metric.NewCounterMetric(key, 0)
+		pc := model.NewCounterMetric(key, 0)
 		agent.Metrics[key] = pc
 	}
 	pc := agent.Metrics[key]
-	pc.UpdateValue(value)
+	err := pc.UpdateValue(value)
+	if err != nil {
+		logger.GetLogger().Errorf("can't update value on key=%s, new value=%d, error=%v", key, value, err)
+	}
 }
 
 func (agent *Agent) UpdateMetricValueGauge(key string, value float64) {
 	if _, ok := agent.Metrics[key]; !ok {
-		pc := metric.NewGaugeMetric(key, 0)
+		pc := model.NewGaugeMetric(key, 0)
 		agent.Metrics[key] = pc
 	}
 	pc := agent.Metrics[key]
-	pc.UpdateValue(value)
+	err := pc.UpdateValue(value)
+	if err != nil {
+		logger.GetLogger().Errorf("can't update value on key=%s, new value=%f, error=%v", key, value, err)
+	}
 }
 
 func (agent *Agent) Update(pollInterval int) {
@@ -104,7 +116,7 @@ func (agent *Agent) Update(pollInterval int) {
 		agent.UpdateMetricValueGauge(Alloc, float64(stats.Alloc))
 		agent.UpdateMetricValueGauge(BuckHashSys, float64(stats.BuckHashSys))
 		agent.UpdateMetricValueGauge(Frees, float64(stats.Frees))
-		agent.UpdateMetricValueGauge(GCCPUFraction, float64(stats.GCCPUFraction))
+		agent.UpdateMetricValueGauge(GCCPUFraction, stats.GCCPUFraction)
 		agent.UpdateMetricValueGauge(GCSys, float64(stats.GCSys))
 		agent.UpdateMetricValueGauge(HeapAlloc, float64(stats.HeapAlloc))
 		agent.UpdateMetricValueGauge(HeapIdle, float64(stats.HeapIdle))
@@ -160,10 +172,26 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 		return
 	}
 
+	var body []byte
+	if _, err := postData.Write(body); err != nil {
+		logger.GetLogger().Errorf("failed to write post data: %v", err)
+	}
+	if key := agent.Sign(body); key != nil {
+		hashSign := hex.EncodeToString(key)
+		req.Header.Set("HashSHA256", hashSign)
+	}
 	req.Header.Set("Content-Encoding", compression)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = agent.Client.Do(req)
 	return
+}
+
+func (agent *Agent) Sign(body []byte) []byte {
+	if agent.hasher.KeyExist() {
+		key := agent.hasher.Generate(body)
+		return key
+	}
+	return nil
 }
 
 func (agent *Agent) SendMetric(key string) error {
@@ -185,7 +213,7 @@ func (agent *Agent) SendMetric(key string) error {
 
 	if resp, err := agent.Post(postPath, data, true); err != nil {
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		return err
 	}
@@ -204,14 +232,14 @@ func (agent *Agent) SendMetricsBatch() error {
 	postPath := agent.address + "/updates/"
 	if resp, err := agent.Post(postPath, data, true); err != nil {
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		return err
 	}
 	return nil
 }
 
-func (agent *Agent) toList() (metrics []metric.Metric) {
+func (agent *Agent) toList() (metrics []model.Metric) {
 	for _, metric := range agent.Metrics {
 		metrics = append(metrics, metric)
 	}
@@ -228,7 +256,7 @@ func (agent *Agent) SendData(reportInterval int) {
 	}
 }
 
-func (agent Agent) Run(pollInterval int, reportInterval int) {
+func (agent *Agent) Run(pollInterval int, reportInterval int) {
 	go agent.Update(pollInterval)
 	agent.SendData(reportInterval)
 }

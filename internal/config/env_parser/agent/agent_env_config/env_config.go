@@ -9,9 +9,10 @@ type Config struct {
 	Address        *string `env:"ADDRESS"`
 	PollInterval   *int    `env:"POLL_INTERVAL"`
 	ReportInterval *int    `env:"REPORT_INTERVAL"`
+	Key            *string `env:"KEY"`
 }
 
-func New(address string, pollInterval int, reportInterval int) (cfg Config) {
+func New(address string, pollInterval int, reportInterval int, key string) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
 		logger.GetLogger().Errorf("error while reading env variables=%s", err)
@@ -24,6 +25,9 @@ func New(address string, pollInterval int, reportInterval int) (cfg Config) {
 	}
 	if cfg.PollInterval == nil {
 		cfg.PollInterval = &pollInterval
+	}
+	if cfg.Key == nil {
+		cfg.Key = &key
 	}
 	return
 }

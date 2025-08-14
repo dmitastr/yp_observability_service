@@ -3,6 +3,7 @@ package hash_sign
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 
@@ -40,6 +41,10 @@ func (hg *HashGenerator) CheckHash(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		hashRequest := req.Header.Get("HashSHA256")
 		if hashRequest != "" && hg.KeyExist() {
+			hashDecoded, err := hex.DecodeString(hashRequest)
+			if err != nil {
+				logger.GetLogger().Errorf("can't read hash header to bytes: %v", err)
+			}
 			var body []byte
 			if _, err := req.Body.Read(body); err != nil {
 				logger.GetLogger().Errorf("Error reading body: %v", err)
@@ -54,7 +59,7 @@ func (hg *HashGenerator) CheckHash(next http.Handler) http.Handler {
 			}(req.Body)
 
 			hashExpected := hg.Generate(body)
-			if !hg.Verify(hashExpected, []byte(hashRequest)) {
+			if !hg.Verify(hashExpected, hashDecoded) {
 				logger.GetLogger().Errorf("hashes are not equal")
 				http.Error(res, "Error verifying hash", http.StatusBadRequest)
 				return
