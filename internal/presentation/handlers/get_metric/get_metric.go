@@ -12,15 +12,15 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
-type GetMetricHandler struct {
+type Handler struct {
 	service srv.ServiceAbstract
 }
 
-func NewHandler(s srv.ServiceAbstract) *GetMetricHandler {
-	return &GetMetricHandler{service: s}
+func NewHandler(s srv.ServiceAbstract) *Handler {
+	return &Handler{service: s}
 }
 
-func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (handler Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var upd update.MetricUpdate
 
 	switch req.Method {
@@ -31,7 +31,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 	case http.MethodPost:
 		if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		upd.MetricValue = "1"
 	default:
@@ -56,21 +56,25 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 
 	switch req.Method {
 	case http.MethodGet:
-		valString, err := metric.GetValueString()
+		valString, err := metric.GetValueString(upd.MType)
 		if err != nil {
 			http.Error(res, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte(valString))
+
+		if _, err = res.Write([]byte(valString)); err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
-		
+
 	case http.MethodPost:
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(res).Encode(&metric); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		return
 	default:

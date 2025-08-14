@@ -19,21 +19,6 @@ type MetricEntity struct {
 	CounterValue int64
 }
 
-func ModelToEntity(metric models.Metrics) MetricEntity {
-	entity := MetricEntity{
-		ID:    metric.ID,
-		MType: metric.MType,
-	}
-	if metric.Value != nil {
-		entity.GaugeValue = *metric.Value
-	}
-	if metric.Delta != nil {
-		entity.CounterValue = *metric.Delta
-	}
-
-	return entity
-}
-
 type Storage struct {
 	sync.Mutex
 	Metrics       map[string]models.Metrics
@@ -110,7 +95,7 @@ func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics
 		if err := storage.BackupManager.Flush(metrics); err != nil {
 			return err
 		}
-		
+
 	}
 	return nil
 }
@@ -121,7 +106,7 @@ func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 
 func (storage *Storage) Get(ctx context.Context, key string) (*models.Metrics, error) {
 	if metric, ok := storage.Metrics[key]; ok {
-		logger.GetLogger().Infof("Found metric: %s", metric)
+		logger.GetLogger().Infof("Found metric: %v", metric)
 		return &metric, nil
 	}
 	return nil, errs.ErrorMetricDoesNotExist

@@ -43,7 +43,12 @@ func (fs *FileStorage) createFile() *os.File {
 
 func (fs *FileStorage) Flush(metrics []models.Metrics) error {
 	file := fs.createFile()
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			logger.GetLogger().Errorf("error while closing file '%s': %v", fs.FileName, err)
+		}
+	}(file)
 	if err := json.NewEncoder(file).Encode(metrics); err != nil {
 		logger.GetLogger().Error(err)
 		return err
@@ -57,7 +62,12 @@ func (fs *FileStorage) Load() (metrics []models.Metrics, err error) {
 		logger.GetLogger().Infof("error while opening file '%s': %s", fs.FileName, err)
 		return metrics, err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			logger.GetLogger().Errorf("error while closing file '%s': %v", fs.FileName, err)
+		}
+	}(file)
 
 	if err = json.NewDecoder(file).Decode(&metrics); err != nil {
 		logger.GetLogger().Error(err)

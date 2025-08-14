@@ -35,9 +35,9 @@ type Cursor interface {
 	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 }
 
-var maxErrorRetries int = 3
-var delaySlope int = 2
-var delayRise int = 1
+var maxErrorRetries = 3
+var delaySlope = 2
+var delayRise = 1
 var linearBackOff = func(attempt, slope, rise int) time.Duration {
 	return time.Duration(slope*attempt+rise) * time.Second
 }
@@ -56,7 +56,7 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
     delta = metrics.delta + @delta `
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
-	
+
 	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
 	if err != nil {
 		logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
@@ -65,28 +65,28 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 		Logger:   logger.GetLogger(),
 		LogLevel: tracelog.LogLevelInfo,
 	}
-	
+
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
 	}
 	logger.GetLogger().Info("Database connection established successfully")
-	
+
 	delayFunc := func(exec failsafe.ExecutionAttempt[any]) time.Duration {
 		return linearBackOff(exec.Attempts(), delaySlope, delayRise)
 	}
 	retry := retrypolicy.Builder[any]().HandleIf(func(_ any, err error) bool {
 		pgerrClassifier := pgerrors.NewPostgresErrorClassifier()
 		return pgerrClassifier.Classify(err) == pgerrors.Retriable
-		
-		}).WithMaxRetries(maxErrorRetries).
+
+	}).WithMaxRetries(maxErrorRetries).
 		WithDelayFunc(delayFunc).Build()
-		
-		pg := &Postgres{db: pool, retryPolicy: retry}
-		
-		return pg, nil
-	}
-	
+
+	pg := &Postgres{db: pool, retryPolicy: retry}
+
+	return pg, nil
+}
+
 func (pg *Postgres) Init() error {
 	db, err := sql.Open("postgres", pg.db.Config().ConnString())
 	if err != nil {
@@ -111,9 +111,9 @@ func (pg *Postgres) Init() error {
 	}
 	logger.GetLogger().Info("Migration up completed successfully")
 	return nil
-	
+
 }
-	
+
 func (pg *Postgres) Ping(ctx context.Context) error {
 	return pg.db.Ping(ctx)
 }
@@ -124,7 +124,7 @@ func (pg *Postgres) Close() error {
 }
 
 func (pg *Postgres) ExecuteTX(ctx context.Context, conn Conn, fnc ExecuteWithRetryFunc) error {
-	//nolint: wrapcheck
+	// nolint: wrapcheck
 	return failsafe.NewExecutor(pg.retryPolicy).
 		WithContext(ctx).
 		RunWithExecution(func(exec failsafe.Execution[any]) (err error) { //nolint:contextcheck
@@ -134,7 +134,12 @@ func (pg *Postgres) ExecuteTX(ctx context.Context, conn Conn, fnc ExecuteWithRet
 				return fmt.Errorf("failed to begin tx: %w", err)
 			}
 
-			defer tx.Rollback(ctx)
+			defer func(tx pgx.Tx, ctx context.Context) {
+				err := tx.Rollback(ctx)
+				if err != nil {
+					logger.GetLogger().Fatalf("Failed to rollback tx: %v", err)
+				}
+			}(tx, ctx)
 
 			if err := fnc(tx); err != nil {
 				return err
@@ -153,7 +158,10 @@ func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 		args := metric.ToNamedArgs()
 
 		if _, err := tx.Exec(ctx, query, args); err != nil {
-			tx.Rollback(ctx)
+			err := tx.Rollback(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to rollback tx: %w", err)
+			}
 			logger.GetLogger().Errorf("unable to insert row: %v", err)
 			return err
 		}
@@ -190,7 +198,7 @@ func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, erro
 
 	fun := func(tx pgx.Tx) error {
 		m, err := pg.getWithinTx(ctx, name, tx)
-			if err != nil {
+		if err != nil {
 			return fmt.Errorf("unable to query metrics: %w", err)
 		}
 		metric = m
@@ -214,8 +222,6 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return metrics, err
 }
 
-
-
 func (pg *Postgres) getWithinTx(ctx context.Context, name string, conn Cursor) (*models.Metrics, error) {
 	if conn == nil {
 		conn = pg.db
@@ -235,7 +241,7 @@ func (pg *Postgres) getAllWithinTx(ctx context.Context, conn Cursor) ([]models.M
 	if conn == nil {
 		conn = pg.db
 	}
-	
+
 	query := `SELECT name, mtype, value, delta FROM metrics`
 
 	rows, err := conn.Query(ctx, query)

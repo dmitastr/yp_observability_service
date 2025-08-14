@@ -2,6 +2,7 @@ package postgrespinger
 
 import (
 	"context"
+
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
 )
 

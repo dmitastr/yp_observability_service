@@ -11,7 +11,7 @@ type DisplayMetric struct {
 }
 
 func ModelToDisplay(m models.Metrics) DisplayMetric {
-	val, err := m.GetValueString()
+	val, err := m.GetValueString(m.MType)
 	if err != nil {
 		val = ""
 	}

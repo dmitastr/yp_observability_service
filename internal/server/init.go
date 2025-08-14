@@ -23,7 +23,7 @@ import (
 	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
 
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
-	hashsign "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hashsign"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hashsign"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
 
@@ -37,7 +37,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
 		if err != nil {
-			logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+			logger.GetLogger().Panicf("couldn't connect to postgres database: %v", err)
 		}
 	}
 	if err := storage.Init(); err != nil {
@@ -60,7 +60,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	hashGenerator := hashsign.NewHashGenerator(cfg.Key)
 	router.Use(
 		requestlogger.RequestLogger,
-		compress.CompressMiddleware,
+		compress.Handler,
 		hashGenerator.CheckHash,
 	)
 

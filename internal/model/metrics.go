@@ -14,6 +14,7 @@ import (
 const (
 	Counter = "counter"
 	Gauge   = "gauge"
+	Any     = "any"
 )
 
 // NOTE: Не усложняем пример, вводя иерархическую вложенность структур.
@@ -45,19 +46,28 @@ func (m *Metrics) DeltaSet(value *int64) {
 	*m.Delta += *value
 }
 
-func (m *Metrics) GetValueString() (val string, err error) {
-	if m.Delta != nil {
-		val = strconv.FormatInt(*m.Delta, 10)
-	} else if m.Value != nil {
-		val = formattools.FormatFloatTrimZero(*m.Value)
-	} else {
+func (m *Metrics) GetValueString(mtype string) (val string, err error) {
+	switch mtype {
+	case Counter:
+		if m.Delta != nil {
+			val = strconv.FormatInt(*m.Delta, 10)
+		}
+	case Gauge:
+		if m.Value != nil {
+			val = formattools.FormatFloatTrimZero(*m.Value)
+		}
+	case Any:
+		if val, err = m.GetValueString(Counter); val == "" {
+			return m.GetValueString(Gauge)
+		}
+	default:
 		err = errs.ErrorValueFromEmptyMetric
 	}
 	return val, err
 }
 
 func (m *Metrics) String() string {
-	strVal, err := m.GetValueString()
+	strVal, err := m.GetValueString(Any)
 	if err != nil {
 		logger.GetLogger().Error(err)
 		return ""

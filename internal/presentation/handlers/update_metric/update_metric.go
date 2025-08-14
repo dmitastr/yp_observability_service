@@ -30,7 +30,7 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	name := req.PathValue("name")
 	value := req.PathValue("value")
 	logger.GetLogger().Infof("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
-	
+
 	upd, err := update.New(name, mtype, value)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
@@ -53,8 +53,7 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	err = handler.service.ProcessUpdate(ctx, upd)
 
 	if err != nil {
-		res.WriteHeader(http.StatusBadRequest)
-		res.Write([]byte(err.Error()))
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 

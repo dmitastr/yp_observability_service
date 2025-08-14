@@ -15,8 +15,8 @@ type Metric interface {
 }
 
 type GaugeMetric struct {
-	ID    string `json:"id"`
-	MType string `json:"type"`
+	ID    string  `json:"id"`
+	MType string  `json:"type"`
 	Value float64 `json:"value"`
 }
 
@@ -24,7 +24,7 @@ func NewGaugeMetric(ID string, Value float64) *GaugeMetric {
 	return &GaugeMetric{ID: ID, MType: "gauge", Value: Value}
 }
 
-func (m GaugeMetric) ToString() [3]string {
+func (m *GaugeMetric) ToString() [3]string {
 	pathParams := [3]string{m.MType, m.ID, m.GetStringValue()}
 	return pathParams
 }
@@ -37,30 +37,30 @@ func (m *GaugeMetric) UpdateValue(value any) error {
 	return fmt.Errorf("wrong value: expected float64, got %v", value)
 }
 
-func (m GaugeMetric) GetStringValue() string {
+func (m *GaugeMetric) GetStringValue() string {
 	return formattools.FormatFloatTrimZero(m.Value)
 }
 
-func (m GaugeMetric) GetValue() any {
+func (m *GaugeMetric) GetValue() any {
 	return m.Value
 }
 
 type CounterMetric struct {
 	ID    string `json:"id"`
 	MType string `json:"type"`
-	Value int64 `json:"delta"`
+	Value int64  `json:"delta"`
 }
 
 func NewCounterMetric(ID string, Value int64) *CounterMetric {
 	return &CounterMetric{ID: ID, MType: "counter", Value: Value}
 }
 
-func (m CounterMetric) ToString() [3]string {
+func (m *CounterMetric) ToString() [3]string {
 	pathParams := [3]string{m.MType, m.ID, m.GetStringValue()}
 	return pathParams
 }
 
-func (m CounterMetric) GetStringValue() string {
+func (m *CounterMetric) GetStringValue() string {
 	return strconv.FormatInt(m.Value, 10)
 }
 
@@ -72,6 +72,6 @@ func (m *CounterMetric) UpdateValue(value any) error {
 	return fmt.Errorf("wrong value: expected int64, got %v", value)
 }
 
-func (m CounterMetric) GetValue() any {
+func (m *CounterMetric) GetValue() any {
 	return m.Value
 }
