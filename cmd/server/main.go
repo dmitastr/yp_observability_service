@@ -6,6 +6,7 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
 	"github.com/dmitastr/yp_observability_service/internal/server"
 )
 
@@ -33,7 +34,12 @@ func main() {
 	cfg := serverenvconfig.New(ServerAddress, StoreInterval, FileStoragePath, Restore, DBUrl, Key)
 
 	router, db := server.NewServer(cfg)
-	defer db.Close()
+	defer func(db dbinterface.Database) {
+		err := db.Close()
+		if err != nil {
+
+		}
+	}(db)
 
 	logger.GetLogger().Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
 	if err := http.ListenAndServe(*cfg.Address, router); err != nil {
