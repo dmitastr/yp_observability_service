@@ -60,8 +60,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	hashGenerator := hashsign.NewHashGenerator(cfg.Key)
 	router.Use(
 		requestlogger.RequestLogger,
-		compress.Handler,
 		hashGenerator.CheckHash,
+		compress.Handler,
 	)
 
 	// setting routes

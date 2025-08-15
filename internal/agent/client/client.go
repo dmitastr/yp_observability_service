@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/hex"
 	"encoding/json"
 	"math/rand"
 	"net/http"
@@ -177,19 +176,19 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 		logger.GetLogger().Errorf("failed to write post data: %v", err)
 	}
 	if key := agent.Sign(body); key != nil {
-		hashSign := hex.EncodeToString(key)
-		req.Header.Set("HashSHA256", hashSign)
+		req.Header.Set("HashSHA256", *key)
 	}
 	req.Header.Set("Content-Encoding", compression)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err = agent.Client.Do(req)
-	return
+
+	return agent.Client.Do(req)
 }
 
-func (agent *Agent) Sign(body []byte) []byte {
+func (agent *Agent) Sign(body []byte) *string {
 	if agent.hasher.KeyExist() {
 		key := agent.hasher.Generate(body)
-		return key
+		keyString := agent.hasher.Encode(key)
+		return &keyString
 	}
 	return nil
 }

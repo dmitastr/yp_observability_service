@@ -26,7 +26,7 @@ func New(address string, pollInterval int, reportInterval int, key string) (cfg 
 	if cfg.PollInterval == nil {
 		cfg.PollInterval = &pollInterval
 	}
-	if cfg.Key == nil {
+	if cfg.Key == nil && key != "" {
 		cfg.Key = &key
 	}
 	return
