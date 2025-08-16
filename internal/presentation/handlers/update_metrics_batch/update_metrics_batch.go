@@ -35,7 +35,7 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	defer cancel()
 
 	if err := handler.service.BatchUpdate(ctx, metrics); err != nil {
-		http.Error(res, fmt.Errorf("error while batch metrics update: %v", err).Error(), http.StatusEarlyHints)
+		http.Error(res, fmt.Errorf("error while batch metrics update: %v", err).Error(), http.StatusInternalServerError)
 		return
 	}
 
