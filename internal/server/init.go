@@ -47,7 +47,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	getMetricHandler := getmetric.NewHandler(observabilityService)
 	listMetricsHandler := listmetric.NewHandler(observabilityService)
 	pingHandler := pingdatabase.New(observabilityService)
-	signedCheckHandler := hash.NewSignedChecker()
+	signedCheckHandler := hash.NewSignedChecker(cfg)
 
 	router := chi.NewRouter()
 
