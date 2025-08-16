@@ -12,6 +12,25 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/signature"
 )
 
+type writer struct {
+	http.ResponseWriter
+	Body       *bytes.Buffer
+	StatusCode *int
+}
+
+func newWriter(w http.ResponseWriter) *writer {
+	return &writer{ResponseWriter: w, Body: bytes.NewBuffer([]byte{})}
+}
+
+func (w *writer) Write(p []byte) (int, error) {
+	w.Body.Write(p)
+	return len(p), nil
+}
+
+func (w *writer) WriteHeader(statusCode int) {
+	w.StatusCode = &statusCode
+}
+
 type SignedChecker struct {
 	HashSigner *signature.HashSigner
 }
@@ -23,7 +42,11 @@ func NewSignedChecker(cfg serverenvconfig.Config) *SignedChecker {
 
 func (s *SignedChecker) Check(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		hashRequest := req.Header.Get("HashSHA256")
+		w := newWriter(res)
+		keyExist := s.HashSigner.KeyExist()
+
+		hashHeaderKey := "HashSHA256"
+		hashRequest := req.Header.Get(hashHeaderKey)
 		if hashRequest != "" {
 			bodyBytes, err := io.ReadAll(req.Body)
 			if err != nil {
@@ -50,6 +73,33 @@ func (s *SignedChecker) Check(next http.Handler) http.Handler {
 			logger.GetLogger().Info("hash signature verified")
 			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
-		next.ServeHTTP(res, req)
+
+		next.ServeHTTP(w, req)
+
+		respBody := w.Body.Bytes()
+		if keyExist {
+			signedBody, err := s.HashSigner.GenerateSignature(respBody)
+			if err != nil {
+				err = fmt.Errorf("error generating hash for response: %w", err)
+				logger.GetLogger().Error(err)
+				http.Error(res, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			res.Header().Set(hashHeaderKey, signedBody)
+		}
+
+		statusCode := http.StatusOK
+		if w.StatusCode != nil {
+			statusCode = *w.StatusCode
+		}
+		res.WriteHeader(statusCode)
+
+		_, err := res.Write(respBody)
+		if err != nil {
+			err = fmt.Errorf("error writing to original response body: %w", err)
+			logger.GetLogger().Error(err)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	})
 }
