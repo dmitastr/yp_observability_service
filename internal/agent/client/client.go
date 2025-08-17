@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -11,9 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dmitastr/yp_observability_service/internal/agent/metric"
+	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
+	"github.com/dmitastr/yp_observability_service/internal/common"
+	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/signature"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -51,12 +55,13 @@ const (
 )
 
 type Agent struct {
-	Metrics map[string]metric.Metric
-	Client  *retryablehttp.Client
-	address string
+	Metrics    map[string]model.Metric
+	Client     *retryablehttp.Client
+	address    string
+	HashSigner *signature.HashSigner
 }
 
-func NewAgent(address string) *Agent {
+func NewAgent(cfg agentenvconfig.Config) *Agent {
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Timeout = time.Millisecond * 300
 	client.RetryMax = 3
@@ -64,21 +69,23 @@ func NewAgent(address string) *Agent {
 		return time.Second * time.Duration(2*attemptNum+1)
 	}
 
+	address := *cfg.Address
 	if !strings.Contains(address, "http") {
 		address = "http://" + address
 	}
 
 	agent := Agent{
-		Metrics: make(map[string]metric.Metric),
-		Client:  client,
-		address: address,
+		Metrics:    make(map[string]model.Metric),
+		Client:     client,
+		address:    address,
+		HashSigner: signature.NewHashSigner(cfg.Key),
 	}
 	return &agent
 }
 
 func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
 	if _, ok := agent.Metrics[key]; !ok {
-		pc := metric.NewCounterMetric(key, 0)
+		pc := model.NewCounterMetric(key, 0)
 		agent.Metrics[key] = pc
 	}
 	pc := agent.Metrics[key]
@@ -87,7 +94,7 @@ func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
 
 func (agent *Agent) UpdateMetricValueGauge(key string, value float64) {
 	if _, ok := agent.Metrics[key]; !ok {
-		pc := metric.NewGaugeMetric(key, 0)
+		pc := model.NewGaugeMetric(key, 0)
 		agent.Metrics[key] = pc
 	}
 	pc := agent.Metrics[key]
@@ -160,6 +167,14 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 		return
 	}
 
+	if agent.HashSigner.KeyExist() {
+		hashSignature, err := agent.HashSigner.GenerateSignature(postData.Bytes())
+		if err != nil {
+			logger.GetLogger().Panicf("failed to generate hash signature: %v", err)
+		}
+		req.Header.Set(common.HashHeaderKey, hashSignature)
+	}
+
 	req.Header.Set("Content-Encoding", compression)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = agent.Client.Do(req)
@@ -202,16 +217,25 @@ func (agent *Agent) SendMetricsBatch() error {
 	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
 	postPath := agent.address + "/updates/"
-	if resp, err := agent.Post(postPath, data, true); err != nil {
+	resp, err := agent.Post(postPath, data, true)
+	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
 		return err
 	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.GetLogger().Errorf("failed to read response body: %v", err)
+	}
+	defer resp.Body.Close()
+
+	logger.GetLogger().Infof("Batch metrics response: status_code=%d, body=%s\n", resp.StatusCode, body)
 	return nil
 }
 
-func (agent *Agent) toList() (metrics []metric.Metric) {
+func (agent *Agent) toList() (metrics []model.Metric) {
 	for _, metric := range agent.Metrics {
 		metrics = append(metrics, metric)
 	}
@@ -228,7 +252,7 @@ func (agent *Agent) SendData(reportInterval int) {
 	}
 }
 
-func (agent Agent) Run(pollInterval int, reportInterval int) {
+func (agent *Agent) Run(pollInterval int, reportInterval int) {
 	go agent.Update(pollInterval)
 	agent.SendData(reportInterval)
 }
