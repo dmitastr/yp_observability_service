@@ -30,6 +30,6 @@ func main() {
 		*cfg.ReportInterval,
 	)
 
-	agent := client.NewAgent(*cfg.Address)
+	agent := client.NewAgent(cfg)
 	agent.Run(*cfg.PollInterval, *cfg.ReportInterval)
 }

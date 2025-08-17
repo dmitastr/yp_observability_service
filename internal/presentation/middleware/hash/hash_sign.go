@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/signature"
@@ -45,8 +46,7 @@ func (s *SignedChecker) Check(next http.Handler) http.Handler {
 		w := newWriter(res)
 		keyExist := s.HashSigner.KeyExist()
 
-		hashHeaderKey := "HashSHA256"
-		hashRequest := req.Header.Get(hashHeaderKey)
+		hashRequest := req.Header.Get(common.HashHeaderKey)
 		if hashRequest != "" {
 			bodyBytes, err := io.ReadAll(req.Body)
 			if err != nil {
@@ -85,7 +85,7 @@ func (s *SignedChecker) Check(next http.Handler) http.Handler {
 				http.Error(res, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			res.Header().Set(hashHeaderKey, signedBody)
+			res.Header().Set(common.HashHeaderKey, signedBody)
 		}
 
 		statusCode := http.StatusOK

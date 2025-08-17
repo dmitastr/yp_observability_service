@@ -13,7 +13,11 @@ type HashSigner struct {
 }
 
 func NewHashSigner(key *string) *HashSigner {
-	return &HashSigner{Key: key}
+	hs := &HashSigner{}
+	if key != nil && *key != "" {
+		hs.Key = key
+	}
+	return hs
 }
 
 func (hs *HashSigner) KeyExist() bool {
