@@ -275,7 +275,7 @@ func (agent *Agent) WorkerPoolCreation() error {
 		}()
 	}
 
-	chunkSize := int(math.Ceil(float64(len(metrics) / agent.RateLimit)))
+	chunkSize := int(math.Ceil(float64(len(metrics)) / float64(agent.RateLimit)))
 	for i := 0; i < len(metrics); i += chunkSize {
 		end := i + chunkSize
 		if end > len(metrics) {
