@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
@@ -54,11 +57,16 @@ const (
 	PollCount   string = "PollCount"
 )
 
+type Result struct {
+	err error
+}
+
 type Agent struct {
 	Metrics    map[string]model.Metric
 	Client     *retryablehttp.Client
 	address    string
 	HashSigner *signature.HashSigner
+	RateLimit  int
 }
 
 func NewAgent(cfg agentenvconfig.Config) *Agent {
@@ -79,6 +87,7 @@ func NewAgent(cfg agentenvconfig.Config) *Agent {
 		Client:     client,
 		address:    address,
 		HashSigner: signature.NewHashSigner(cfg.Key),
+		RateLimit:  *cfg.RateLimit,
 	}
 	return &agent
 }
@@ -207,11 +216,15 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
-func (agent *Agent) SendMetricsBatch() error {
-	metrics := agent.toList()
+func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<- Result) error {
+	// defer close(resultCh)
+
+	metrics := <-inCh
+	// metrics := agent.toList()
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
+		resultCh <- Result{err: fmt.Errorf("failed to marshal metrics: %w", err)}
 		return err
 	}
 	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
@@ -222,12 +235,14 @@ func (agent *Agent) SendMetricsBatch() error {
 		if resp != nil {
 			resp.Body.Close()
 		}
+		resultCh <- Result{err: fmt.Errorf("failed to send metrics: %w", err)}
 		return err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logger.GetLogger().Errorf("failed to read response body: %v", err)
+		// logger.GetLogger().Errorf("failed to read response body: %v", err)
+		resultCh <- Result{err: fmt.Errorf("failed to read response body: %w", err)}
 	}
 	defer resp.Body.Close()
 
@@ -242,11 +257,52 @@ func (agent *Agent) toList() (metrics []model.Metric) {
 	return
 }
 
+func (agent *Agent) WorkerPoolCreation() error {
+	var wg sync.WaitGroup
+	logger.GetLogger().Infof("Starting worker pool creation")
+
+	metrics := agent.toList()
+
+	resultCh := make(chan Result, agent.RateLimit)
+	inCh := make(chan []model.Metric, agent.RateLimit)
+
+	for w := range agent.RateLimit {
+		wg.Add(1)
+		logger.GetLogger().Infof("Worker %d starting", w)
+		go func() {
+			_ = agent.SendMetricsBatch(inCh, resultCh)
+			wg.Done()
+		}()
+	}
+
+	chunkSize := int(math.Ceil(float64(len(metrics) / agent.RateLimit)))
+	for i := 0; i < len(metrics); i += chunkSize {
+		end := i + chunkSize
+		if end > len(metrics) {
+			end = len(metrics)
+		}
+		inCh <- metrics[i:end]
+	}
+	close(inCh)
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	for res := range resultCh {
+		if res.err != nil {
+			logger.GetLogger().Errorf("failed to send metrics batch: %v", res.err)
+		}
+	}
+	return nil
+}
+
 func (agent *Agent) SendData(reportInterval int) {
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		if err := agent.SendMetricsBatch(); err != nil {
+		if err := agent.WorkerPoolCreation(); err != nil {
 			logger.GetLogger().Error(err)
 		}
 	}

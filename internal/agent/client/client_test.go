@@ -13,7 +13,7 @@ import (
 // DONE
 func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 	addr := `localhost:8080`
-	cfg := agentenvconfig.New(addr, 0, 0, "")
+	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
 	type args struct {
 		key   string
 		value int64
@@ -53,7 +53,7 @@ func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 
 func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 	addr := `localhost:8080`
-	cfg := agentenvconfig.New(addr, 0, 0, "")
+	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
 	type args struct {
 		key   string
 		value float64
@@ -122,7 +122,7 @@ func TestAgent_SendMetric(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := agentenvconfig.New(srv.URL, 0, 0, "")
+			cfg := agentenvconfig.New(srv.URL, 0, 0, "", 1)
 			agent := NewAgent(cfg)
 			agent.UpdateMetricValueCounter("abc", 1)
 			err := agent.SendMetric(tt.keyToSend)
