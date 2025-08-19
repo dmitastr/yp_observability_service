@@ -154,22 +154,3 @@ func TestAgent_SendData(t *testing.T) {
 		})
 	}
 }
-
-func TestAgent_Run(t *testing.T) {
-	type args struct {
-		pollInterval   int
-		reportInterval int
-	}
-	tests := []struct {
-		name  string
-		agent Agent
-		args  args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.agent.Run(tt.args.pollInterval, tt.args.reportInterval)
-		})
-	}
-}
