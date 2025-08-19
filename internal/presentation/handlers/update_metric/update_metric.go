@@ -3,6 +3,7 @@ package updatemetric
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -30,15 +31,17 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	name := req.PathValue("name")
 	value := req.PathValue("value")
 	logger.GetLogger().Infof("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
-	
+
 	upd, err := update.New(name, mtype, value)
 	if err != nil {
+		err = fmt.Errorf("error creating update from request: %v", err)
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if upd.IsEmpty() {
 		if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
+			err = fmt.Errorf("error while reading request body: %v", err)
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -51,10 +54,9 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	defer cancel()
 
 	err = handler.service.ProcessUpdate(ctx, upd)
-
 	if err != nil {
-		res.WriteHeader(http.StatusBadRequest)
-		res.Write([]byte(err.Error()))
+		err = fmt.Errorf("get error while processing update: %v", err)
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
 
