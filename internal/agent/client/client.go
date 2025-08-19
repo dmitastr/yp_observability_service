@@ -15,46 +15,53 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
+
 	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/signature"
-	"github.com/hashicorp/go-retryablehttp"
 )
 
 const (
-	Alloc         string = "Alloc"
-	BuckHashSys   string = "BuckHashSys"
-	Frees         string = "Frees"
-	GCCPUFraction string = "GCCPUFraction"
-	GCSys         string = "GCSys"
-	HeapAlloc     string = "HeapAlloc"
-	HeapIdle      string = "HeapIdle"
-	HeapInuse     string = "HeapInuse"
-	HeapObjects   string = "HeapObjects"
-	HeapReleased  string = "HeapReleased"
-	HeapSys       string = "HeapSys"
-	LastGC        string = "LastGC"
-	Lookups       string = "Lookups"
-	MCacheInuse   string = "MCacheInuse"
-	MCacheSys     string = "MCacheSys"
-	MSpanInuse    string = "MSpanInuse"
-	MSpanSys      string = "MSpanSys"
-	Mallocs       string = "Mallocs"
-	NextGC        string = "NextGC"
-	NumForcedGC   string = "NumForcedGC"
-	NumGC         string = "NumGC"
-	OtherSys      string = "OtherSys"
-	PauseTotalNs  string = "PauseTotalNs"
-	StackInuse    string = "StackInuse"
-	StackSys      string = "StackSys"
-	Sys           string = "Sys"
-	TotalAlloc    string = "TotalAlloc"
+	Alloc         = "Alloc"
+	BuckHashSys   = "BuckHashSys"
+	Frees         = "Frees"
+	GCCPUFraction = "GCCPUFraction"
+	GCSys         = "GCSys"
+	HeapAlloc     = "HeapAlloc"
+	HeapIdle      = "HeapIdle"
+	HeapInuse     = "HeapInuse"
+	HeapObjects   = "HeapObjects"
+	HeapReleased  = "HeapReleased"
+	HeapSys       = "HeapSys"
+	LastGC        = "LastGC"
+	Lookups       = "Lookups"
+	MCacheInuse   = "MCacheInuse"
+	MCacheSys     = "MCacheSys"
+	MSpanInuse    = "MSpanInuse"
+	MSpanSys      = "MSpanSys"
+	Mallocs       = "Mallocs"
+	NextGC        = "NextGC"
+	NumForcedGC   = "NumForcedGC"
+	NumGC         = "NumGC"
+	OtherSys      = "OtherSys"
+	PauseTotalNs  = "PauseTotalNs"
+	StackInuse    = "StackInuse"
+	StackSys      = "StackSys"
+	Sys           = "Sys"
+	TotalAlloc    = "TotalAlloc"
 
-	RandomValue string = "RandomValue"
-	PollCount   string = "PollCount"
+	RandomValue = "RandomValue"
+	PollCount   = "PollCount"
+
+	TotalMemory     = "TotalMemory"
+	FreeMemory      = "FreeMemory"
+	CPUutilization1 = "CPUUtilization1"
 )
 
 type Result struct {
@@ -62,6 +69,7 @@ type Result struct {
 }
 
 type Agent struct {
+	sync.Mutex
 	Metrics    map[string]model.Metric
 	Client     *retryablehttp.Client
 	address    string
@@ -110,44 +118,66 @@ func (agent *Agent) UpdateMetricValueGauge(key string, value float64) {
 	pc.UpdateValue(value)
 }
 
+func (agent *Agent) UpdateSysUtilMetrics() {
+	agent.Mutex.Lock()
+	defer agent.Mutex.Unlock()
+
+	v, _ := mem.VirtualMemory()
+
+	agent.UpdateMetricValueGauge(TotalMemory, float64(v.Total))
+	agent.UpdateMetricValueGauge(FreeMemory, float64(v.Free))
+	cpuStats, _ := cpu.Info()
+	if len(cpuStats) > 0 {
+		agent.UpdateMetricValueGauge(CPUutilization1, float64(cpuStats[0].CPU))
+	}
+}
+
+func (agent *Agent) UpdateRuntimeMetrics() {
+	agent.Mutex.Lock()
+	defer agent.Mutex.Unlock()
+
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+
+	agent.UpdateMetricValueGauge(Alloc, float64(stats.Alloc))
+	agent.UpdateMetricValueGauge(BuckHashSys, float64(stats.BuckHashSys))
+	agent.UpdateMetricValueGauge(Frees, float64(stats.Frees))
+	agent.UpdateMetricValueGauge(GCCPUFraction, stats.GCCPUFraction)
+	agent.UpdateMetricValueGauge(GCSys, float64(stats.GCSys))
+	agent.UpdateMetricValueGauge(HeapAlloc, float64(stats.HeapAlloc))
+	agent.UpdateMetricValueGauge(HeapIdle, float64(stats.HeapIdle))
+	agent.UpdateMetricValueGauge(HeapInuse, float64(stats.HeapInuse))
+	agent.UpdateMetricValueGauge(HeapObjects, float64(stats.HeapObjects))
+	agent.UpdateMetricValueGauge(HeapReleased, float64(stats.HeapReleased))
+	agent.UpdateMetricValueGauge(HeapSys, float64(stats.HeapSys))
+	agent.UpdateMetricValueGauge(LastGC, float64(stats.LastGC))
+	agent.UpdateMetricValueGauge(Lookups, float64(stats.Lookups))
+	agent.UpdateMetricValueGauge(MCacheInuse, float64(stats.MCacheInuse))
+	agent.UpdateMetricValueGauge(MCacheSys, float64(stats.MCacheSys))
+	agent.UpdateMetricValueGauge(MSpanInuse, float64(stats.MSpanInuse))
+	agent.UpdateMetricValueGauge(MSpanSys, float64(stats.MSpanSys))
+	agent.UpdateMetricValueGauge(Mallocs, float64(stats.Mallocs))
+	agent.UpdateMetricValueGauge(NextGC, float64(stats.NextGC))
+	agent.UpdateMetricValueGauge(NumForcedGC, float64(stats.NumForcedGC))
+	agent.UpdateMetricValueGauge(NumGC, float64(stats.NumGC))
+	agent.UpdateMetricValueGauge(OtherSys, float64(stats.OtherSys))
+	agent.UpdateMetricValueGauge(PauseTotalNs, float64(stats.PauseTotalNs))
+	agent.UpdateMetricValueGauge(StackInuse, float64(stats.StackInuse))
+	agent.UpdateMetricValueGauge(StackSys, float64(stats.StackSys))
+	agent.UpdateMetricValueGauge(Sys, float64(stats.Sys))
+	agent.UpdateMetricValueGauge(TotalAlloc, float64(stats.TotalAlloc))
+	agent.UpdateMetricValueGauge(RandomValue, 100*rand.Float64())
+
+	agent.UpdateMetricValueCounter(PollCount, 1)
+}
+
 func (agent *Agent) Update(pollInterval int) {
+
 	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		var stats runtime.MemStats
-		runtime.ReadMemStats(&stats)
-
-		agent.UpdateMetricValueGauge(Alloc, float64(stats.Alloc))
-		agent.UpdateMetricValueGauge(BuckHashSys, float64(stats.BuckHashSys))
-		agent.UpdateMetricValueGauge(Frees, float64(stats.Frees))
-		agent.UpdateMetricValueGauge(GCCPUFraction, float64(stats.GCCPUFraction))
-		agent.UpdateMetricValueGauge(GCSys, float64(stats.GCSys))
-		agent.UpdateMetricValueGauge(HeapAlloc, float64(stats.HeapAlloc))
-		agent.UpdateMetricValueGauge(HeapIdle, float64(stats.HeapIdle))
-		agent.UpdateMetricValueGauge(HeapInuse, float64(stats.HeapInuse))
-		agent.UpdateMetricValueGauge(HeapObjects, float64(stats.HeapObjects))
-		agent.UpdateMetricValueGauge(HeapReleased, float64(stats.HeapReleased))
-		agent.UpdateMetricValueGauge(HeapSys, float64(stats.HeapSys))
-		agent.UpdateMetricValueGauge(LastGC, float64(stats.LastGC))
-		agent.UpdateMetricValueGauge(Lookups, float64(stats.Lookups))
-		agent.UpdateMetricValueGauge(MCacheInuse, float64(stats.MCacheInuse))
-		agent.UpdateMetricValueGauge(MCacheSys, float64(stats.MCacheSys))
-		agent.UpdateMetricValueGauge(MSpanInuse, float64(stats.MSpanInuse))
-		agent.UpdateMetricValueGauge(MSpanSys, float64(stats.MSpanSys))
-		agent.UpdateMetricValueGauge(Mallocs, float64(stats.Mallocs))
-		agent.UpdateMetricValueGauge(NextGC, float64(stats.NextGC))
-		agent.UpdateMetricValueGauge(NumForcedGC, float64(stats.NumForcedGC))
-		agent.UpdateMetricValueGauge(NumGC, float64(stats.NumGC))
-		agent.UpdateMetricValueGauge(OtherSys, float64(stats.OtherSys))
-		agent.UpdateMetricValueGauge(PauseTotalNs, float64(stats.PauseTotalNs))
-		agent.UpdateMetricValueGauge(StackInuse, float64(stats.StackInuse))
-		agent.UpdateMetricValueGauge(StackSys, float64(stats.StackSys))
-		agent.UpdateMetricValueGauge(Sys, float64(stats.Sys))
-		agent.UpdateMetricValueGauge(TotalAlloc, float64(stats.TotalAlloc))
-		agent.UpdateMetricValueGauge(RandomValue, 100*rand.Float64())
-
-		agent.UpdateMetricValueCounter(PollCount, 1)
-
+		go agent.UpdateRuntimeMetrics()
+		go agent.UpdateSysUtilMetrics()
 	}
 }
 
