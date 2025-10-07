@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
@@ -27,7 +28,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
-		
+
 	} else {
 		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
@@ -38,26 +39,28 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	storage.Init()
 
 	pinger := postgrespinger.New()
-		
-	service := service.NewService(storage, pinger)
 
-	metricHandler := updatemetric.NewHandler(service)
-	metricBatchHandler := updatemetricsbatch.NewHandler(service)
-	getMetricHandler := getmetric.NewHandler(service)
-	listMetricsHandler := listmetric.NewHandler(service)
-	pingHandler := pingdatabase.New(service)
+	observabilityService := service.NewService(storage, pinger)
+
+	metricHandler := updatemetric.NewHandler(observabilityService)
+	metricBatchHandler := updatemetricsbatch.NewHandler(observabilityService)
+	getMetricHandler := getmetric.NewHandler(observabilityService)
+	listMetricsHandler := listmetric.NewHandler(observabilityService)
+	pingHandler := pingdatabase.New(observabilityService)
+	signedCheckHandler := hash.NewSignedChecker(cfg)
 
 	router := chi.NewRouter()
 
 	// middleware
 	router.Use(
-		requestlogger.RequestLogger, 
+		requestlogger.RequestLogger,
+		signedCheckHandler.Check,
 		compress.CompressMiddleware,
 	)
 
 	// setting routes
 	router.Get(`/`, listMetricsHandler.ServeHTTP)
-	
+
 	router.Route(`/update`, func(r chi.Router) {
 		r.Post(`/`, metricHandler.ServeHTTP)
 		r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
@@ -71,6 +74,6 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	})
 
 	router.Get(`/ping`, pingHandler.ServeHTTP)
-	
+
 	return router, storage
 }
