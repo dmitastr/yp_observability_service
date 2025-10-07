@@ -6,35 +6,37 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/stretchr/testify/assert"
 )
 
 // DONE
 func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 	addr := `localhost:8080`
+	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
 	type args struct {
 		key   string
 		value int64
 	}
 	tests := []struct {
-		name  string
-		agent *Agent
-		params  []args
+		name      string
+		agent     *Agent
+		params    []args
 		wantValue any
-		wantKey string
+		wantKey   string
 	}{
 		{
-			name: "Valid input",
-			agent: NewAgent(addr),
-			params: []args{{key: "abc", value: 10}},
-			wantKey: "abc",
+			name:      "Valid input",
+			agent:     NewAgent(cfg),
+			params:    []args{{key: "abc", value: 10}},
+			wantKey:   "abc",
 			wantValue: int64(10),
 		},
 		{
-			name: "Update value",
-			agent: NewAgent(addr),
-			params: []args{{key: "abc", value: 10}, {key: "abc", value: 20}},
-			wantKey: "abc",
+			name:      "Update value",
+			agent:     NewAgent(cfg),
+			params:    []args{{key: "abc", value: 10}, {key: "abc", value: 20}},
+			wantKey:   "abc",
 			wantValue: int64(30),
 		},
 	}
@@ -51,29 +53,30 @@ func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 
 func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 	addr := `localhost:8080`
+	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
 	type args struct {
 		key   string
 		value float64
 	}
 	tests := []struct {
-		name  string
-		agent *Agent
-		params  []args
+		name      string
+		agent     *Agent
+		params    []args
 		wantValue any
-		wantKey string
+		wantKey   string
 	}{
 		{
-			name: "Valid input",
-			agent: NewAgent(addr),
-			params: []args{{key: "abc", value: 10}},
-			wantKey: "abc",
+			name:      "Valid input",
+			agent:     NewAgent(cfg),
+			params:    []args{{key: "abc", value: 10}},
+			wantKey:   "abc",
 			wantValue: float64(10.0),
 		},
 		{
-			name: "Update value",
-			agent: NewAgent(addr),
-			params: []args{{key: "abc", value: 10}, {key: "abc", value: 20}},
-			wantKey: "abc",
+			name:      "Update value",
+			agent:     NewAgent(cfg),
+			params:    []args{{key: "abc", value: 10}, {key: "abc", value: 20}},
+			wantKey:   "abc",
 			wantValue: float64(20.0),
 		},
 	}
@@ -88,7 +91,6 @@ func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 	}
 }
 
-
 func TestAgent_SendMetric(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("send request to url=%s\n", r.URL)
@@ -96,43 +98,43 @@ func TestAgent_SendMetric(t *testing.T) {
 	defer srv.Close()
 
 	type args struct {
-		key string
+		key   string
 		value int64
 	}
 	tests := []struct {
-		name       string
-		metrics    args
-		keyToSend  string
-		wantErr    bool
+		name      string
+		metrics   args
+		keyToSend string
+		wantErr   bool
 	}{
 		{
-			name: "valid input",
-			metrics: args{"abc", 10},
+			name:      "valid input",
+			metrics:   args{"abc", 10},
 			keyToSend: "abc",
-			wantErr: false,
+			wantErr:   false,
 		},
 		{
-			name: "missing metric key",
-			metrics: args{"abc", 10},
+			name:      "missing metric key",
+			metrics:   args{"abc", 10},
 			keyToSend: "sdf",
-			wantErr: true,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				agent := NewAgent(srv.URL)
-				agent.UpdateMetricValueCounter("abc", 1)
-				err := agent.SendMetric(tt.keyToSend)
+			cfg := agentenvconfig.New(srv.URL, 0, 0, "", 1)
+			agent := NewAgent(cfg)
+			agent.UpdateMetricValueCounter("abc", 1)
+			err := agent.SendMetric(tt.keyToSend)
 
-				if tt.wantErr {
-					assert.Error(t, err)
-					return
-				}
-				assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
 		})
 	}
 }
-
 
 // TODO
 func TestAgent_SendData(t *testing.T) {
@@ -149,25 +151,6 @@ func TestAgent_SendData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.agent.SendData(tt.args.reportInterval)
-		})
-	}
-}
-
-func TestAgent_Run(t *testing.T) {
-	type args struct {
-		pollInterval   int
-		reportInterval int
-	}
-	tests := []struct {
-		name  string
-		agent Agent
-		args  args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.agent.Run(tt.args.pollInterval, tt.args.reportInterval)
 		})
 	}
 }

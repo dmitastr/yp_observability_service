@@ -3,6 +3,7 @@ package updatemetricsbatch
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -26,7 +27,7 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 
 	var metrics []models.Metrics
 	if err := json.NewDecoder(req.Body).Decode(&metrics); err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		http.Error(res, fmt.Errorf("error while decoding request body: %v", err).Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -34,7 +35,7 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	defer cancel()
 
 	if err := handler.service.BatchUpdate(ctx, metrics); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		http.Error(res, fmt.Errorf("error while batch metrics update: %v", err).Error(), http.StatusInternalServerError)
 		return
 	}
 
