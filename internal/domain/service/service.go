@@ -6,7 +6,6 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
-	auditor "github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/data"
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
@@ -20,7 +19,7 @@ import (
 type Service struct {
 	db      dbinterface.Database
 	pinger  pinger.Pinger
-	auditor auditor.IAuditor
+	auditor audit.IAuditor
 }
 
 func NewService(db dbinterface.Database, pinger pinger.Pinger, auditor audit.IAuditor) *Service {
