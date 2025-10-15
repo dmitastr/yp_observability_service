@@ -2,7 +2,13 @@ package server
 
 import (
 	"context"
+	"net/http"
 
+	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
 	"github.com/go-chi/chi/v5"
 
@@ -39,8 +45,11 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	storage.Init()
 
 	pinger := postgrespinger.New()
+	auditor := audit.NewAuditor().
+		AddListener(listener.NewListener(listener.FileListenerType, cfg.AuditFile)).
+		AddListener(listener.NewListener(listener.URLListenerType, cfg.AuditURL))
 
-	observabilityService := service.NewService(storage, pinger)
+	observabilityService := service.NewService(storage, pinger, auditor)
 
 	metricHandler := updatemetric.NewHandler(observabilityService)
 	metricBatchHandler := updatemetricsbatch.NewHandler(observabilityService)
@@ -76,4 +85,55 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	router.Get(`/ping`, pingHandler.ServeHTTP)
 
 	return router, storage
+}
+
+func Execute() error {
+	rootCmd := &cobra.Command{
+		Use: "YP observability service",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logger.Initialize()
+
+			var cfg serverenvconfig.Config
+			// Unmarshal the configuration into the Config struct
+			if err := viper.Unmarshal(&cfg); err != nil {
+				logger.GetLogger().Errorf("Unable to decode into struct, %v\n", err)
+				return err
+			}
+			router, postgresDB := NewServer(cfg)
+			defer postgresDB.Close()
+
+			logger.GetLogger().Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
+			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	rootCmd.Flags().String("a", "localhost:8080", "set server host and port")
+	rootCmd.Flags().Int("i", 300, "interval for storing data to the file in seconds, 0=stream writing")
+	rootCmd.Flags().Bool("r", false, "restore data from file")
+	rootCmd.Flags().String("f", "./data/data.json", "path for writing data")
+	rootCmd.Flags().String("d", "", "database connection url")
+	rootCmd.Flags().String("k", "", "key for request signing")
+	rootCmd.Flags().String("audit-file", "", "file path for audit logs")
+	rootCmd.Flags().String("audit-url", "", "url for audit logs")
+
+	_ = viper.BindPFlags(rootCmd.Flags())
+
+	viper.AutomaticEnv()
+
+	// Bind environment variables
+	_ = viper.BindEnv("a", "ADDRESS")
+	_ = viper.BindEnv("i", "STORE_INTERVAL")
+	_ = viper.BindEnv("f", "FILE_STORAGE_PATH")
+	_ = viper.BindEnv("r", "RESTORE")
+	_ = viper.BindEnv("d", "DATABASE_DSN")
+	_ = viper.BindEnv("k", "KEY")
+	_ = viper.BindEnv("audit-file", "AUDIT_FILE")
+	_ = viper.BindEnv("audit-url", "AUDIT_URL")
+
+	return rootCmd.Execute()
+
 }

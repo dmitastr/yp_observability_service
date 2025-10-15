@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
@@ -33,6 +34,8 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
+
+	ctx = context.WithValue(ctx, "ipAddress", common.ExtractIP(req))
 
 	if err := handler.service.BatchUpdate(ctx, metrics); err != nil {
 		http.Error(res, fmt.Errorf("error while batch metrics update: %v", err).Error(), http.StatusInternalServerError)

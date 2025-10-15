@@ -4,22 +4,26 @@ import (
 	"context"
 	"slices"
 
+	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
+	auditor "github.com/dmitastr/yp_observability_service/internal/domain/audit"
+	"github.com/dmitastr/yp_observability_service/internal/domain/audit/data"
 	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
+	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
-	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 )
 
 type Service struct {
-	db     dbinterface.Database
-	pinger pinger.Pinger
+	db      dbinterface.Database
+	pinger  pinger.Pinger
+	auditor auditor.IAuditor
 }
 
-func NewService(db dbinterface.Database, pinger pinger.Pinger) *Service {
-	return &Service{db: db, pinger: pinger}
+func NewService(db dbinterface.Database, pinger pinger.Pinger, auditor audit.IAuditor) *Service {
+	return &Service{db: db, pinger: pinger, auditor: auditor}
 }
 
 func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
@@ -30,7 +34,16 @@ func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdat
 }
 
 func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics) error {
-	return service.db.BulkUpdate(ctx, metrics)
+	if err := service.db.BulkUpdate(ctx, metrics); err != nil {
+		return err
+	}
+
+	ip := ctx.Value("ipAddress").(string)
+	auditData := data.NewData(metrics, ip)
+	if err := service.auditor.Notify(auditData); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (service Service) GetMetric(ctx context.Context, upd update.MetricUpdate) (metric *models.Metrics, err error) {
