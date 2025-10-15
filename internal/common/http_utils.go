@@ -2,6 +2,10 @@ package common
 
 import "net/http"
 
+type SenderInfo struct {
+	ip string
+}
+
 func ExtractIP(r *http.Request) (ip string) {
 	forwarded := r.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
@@ -9,5 +13,5 @@ func ExtractIP(r *http.Request) (ip string) {
 	} else {
 		ip = r.RemoteAddr
 	}
-	return
+	return ip
 }

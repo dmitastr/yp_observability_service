@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	auditor "github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/data"
@@ -38,7 +39,7 @@ func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics
 		return err
 	}
 
-	ip := ctx.Value("ipAddress").(string)
+	ip := ctx.Value(common.SenderInfo{}).(string)
 	auditData := data.NewData(metrics, ip)
 	if err := service.auditor.Notify(auditData); err != nil {
 		return err
