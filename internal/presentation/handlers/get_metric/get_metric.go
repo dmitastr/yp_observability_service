@@ -31,7 +31,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 	case http.MethodPost:
 		if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		upd.MetricValue = "1"
 	default:
@@ -64,13 +64,13 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(valString))
 		return
-		
+
 	case http.MethodPost:
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(res).Encode(&metric); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		return
 	default:

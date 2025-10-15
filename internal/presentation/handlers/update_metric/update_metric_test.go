@@ -22,7 +22,6 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 		}
 		return
 	}
-	
 
 	type pathParam struct {
 		key   string
@@ -94,9 +93,9 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 			errValue := errFunc(tt.serviceErrOut)
 
 			mockSrv.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
-			
+
 			handler := NewHandler(mockSrv)
-			
+
 			rr := httptest.NewRecorder()
 			for _, pp := range tt.pathParams {
 				req.SetPathValue(pp.key, pp.value)

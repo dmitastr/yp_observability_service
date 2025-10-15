@@ -39,7 +39,6 @@ func (rww LoggingResponseWriter) WriteHeader(statusCode int) {
 	rww.w.WriteHeader(statusCode)
 }
 
-
 // Сведения о запросах должны содержать URI, метод запроса и время, затраченное на его выполнение.
 // Сведения об ответах должны содержать код статуса и размер содержимого ответа.
 func RequestLogger(h http.Handler) http.Handler {
@@ -51,8 +50,8 @@ func RequestLogger(h http.Handler) http.Handler {
 		h.ServeHTTP(rww, r)
 
 		execTime := time.Since(start)
-		logger.GetLogger().Infof("sending response: execution time=%s, status code=%d, body size=%d", 
-			execTime.String(), 
+		logger.GetLogger().Infof("sending response: execution time=%s, status code=%d, body size=%d",
+			execTime.String(),
 			rww.ResponseData.StatusCode,
 			rww.ResponseData.BodySize,
 		)

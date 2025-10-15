@@ -41,7 +41,7 @@ func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics
 	ip := ctx.Value(common.SenderInfo{}).(string)
 	auditData := data.NewData(metrics, ip)
 	if err := service.auditor.Notify(auditData); err != nil {
-		return err
+		logger.GetLogger().Error(err)
 	}
 	return nil
 }

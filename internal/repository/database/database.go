@@ -15,4 +15,3 @@ type Database interface {
 	Init() error
 	Ping(context.Context) error
 }
-

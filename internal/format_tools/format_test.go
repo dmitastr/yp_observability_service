@@ -10,28 +10,28 @@ func TestFormatFloatTrimZero(t *testing.T) {
 
 	tests := []struct {
 		name string
-		arg float64
+		arg  float64
 		want string
 	}{
 		{
 			name: "No zeros",
-			arg: 10.1,
+			arg:  10.1,
 			want: "10.1",
 		},
 		{
 			name: "Trailing zeros",
-			arg: 10.1000,
+			arg:  10.1000,
 			want: "10.1",
 		},
 		{
 			name: "Long number",
-			arg: 10.10000001,
+			arg:  10.10000001,
 			want: "10.10000001",
 		},
-		
+
 		{
 			name: "No decimal point",
-			arg: 10,
+			arg:  10,
 			want: "10",
 		},
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
+
 func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 	metrics := []entity.DisplayMetric{{Name: "abc", Type: "gauge", StringValue: "10"}}
 	ctrl := gomock.NewController(t)
@@ -22,7 +23,7 @@ func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 		}
 		return
 	}
-	
+
 	tests := []struct {
 		name          string
 		method        string
@@ -32,28 +33,28 @@ func TestListMetricsHandler_ServeHTTP(t *testing.T) {
 		serviceErrOut bool
 	}{
 		{
-			name:     "Valid request",
-			method:   http.MethodGet,
-			url:      "/",
-			wantCode: http.StatusOK,
+			name:          "Valid request",
+			method:        http.MethodGet,
+			url:           "/",
+			wantCode:      http.StatusOK,
 			serviceErrOut: false,
-			wantContent: []string{"Name", "Metrics", "Value"},
+			wantContent:   []string{"Name", "Metrics", "Value"},
 		},
 		{
-			name:     "POST method",
-			method:   http.MethodPost,
-			url:      "/",
-			wantCode: http.StatusMethodNotAllowed,
+			name:          "POST method",
+			method:        http.MethodPost,
+			url:           "/",
+			wantCode:      http.StatusMethodNotAllowed,
 			serviceErrOut: false,
-			wantContent: []string{},
+			wantContent:   []string{},
 		},
 		{
-			name:     "service returned an error",
-			method:   http.MethodGet,
-			url:      "/",
-			wantCode: http.StatusInternalServerError,
+			name:          "service returned an error",
+			method:        http.MethodGet,
+			url:           "/",
+			wantCode:      http.StatusInternalServerError,
 			serviceErrOut: true,
-			wantContent: []string{},
+			wantContent:   []string{},
 		},
 	}
 

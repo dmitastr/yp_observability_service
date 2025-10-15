@@ -110,7 +110,7 @@ func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics
 		if err := storage.BackupManager.Flush(metrics); err != nil {
 			return err
 		}
-		
+
 	}
 	return nil
 }

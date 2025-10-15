@@ -35,25 +35,25 @@ func (c *compressWriter) Close() error {
 	return c.gz.Close()
 }
 
-type compressReader struct {
-    r  io.ReadCloser
-    gz *gzip.Reader
+type CompressReader struct {
+	r  io.ReadCloser
+	gz *gzip.Reader
 }
 
-func NewCompressReader(reader io.ReadCloser) (c *compressReader, err error) {
+func NewCompressReader(reader io.ReadCloser) (c *CompressReader, err error) {
 	gz, err := gzip.NewReader(reader)
 	if err != nil {
 		return
 	}
-	c = &compressReader{r: reader, gz: gz}
+	c = &CompressReader{r: reader, gz: gz}
 	return
 }
 
-func (c *compressReader) Read(p []byte) (int, error) {
+func (c *CompressReader) Read(p []byte) (int, error) {
 	return c.gz.Read(p)
 }
 
-func (c *compressReader) Close() error {
+func (c *CompressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func CompressMiddleware(next http.Handler) http.Handler {
 			cr, err := NewCompressReader(req.Body)
 			if err != nil {
 				res.WriteHeader(http.StatusInternalServerError)
-                return
+				return
 			}
 			req.Body = cr
 		}

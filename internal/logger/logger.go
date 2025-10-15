@@ -17,7 +17,7 @@ func (zl *ZapSugarLogger) Log(ctx context.Context, level tracelog.LogLevel, msg 
 	if err, ok := data["err"].(error); ok && err != nil {
 		data["err"] = err.Error()
 	}
-	
+
 	switch level {
 	case tracelog.LogLevelDebug:
 		zl.Debugw(msg, "pgx_data", data)
@@ -35,7 +35,7 @@ func (zl *ZapSugarLogger) Log(ctx context.Context, level tracelog.LogLevel, msg 
 func Initialize() {
 	cfg := zap.NewDevelopmentConfig()
 	cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-	
+
 	logger, err := cfg.Build()
 	if err != nil {
 		panic(err)

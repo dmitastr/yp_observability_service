@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
 	"github.com/spf13/cobra"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
@@ -64,25 +67,30 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	router.Use(
 		requestlogger.RequestLogger,
 		signedCheckHandler.Check,
-		compress.CompressMiddleware,
 	)
 
-	// setting routes
-	router.Get(`/`, listMetricsHandler.ServeHTTP)
+	// Set path for profiling
+	router.Mount("/debug", middleware.Profiler())
 
-	router.Route(`/update`, func(r chi.Router) {
-		r.Post(`/`, metricHandler.ServeHTTP)
-		r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
+	router.Group(func(r chi.Router) {
+		r.Use(compress.CompressMiddleware)
+		// setting routes
+		r.Get(`/`, listMetricsHandler.ServeHTTP)
+
+		r.Route(`/update`, func(r chi.Router) {
+			r.Post(`/`, metricHandler.ServeHTTP)
+			r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
+		})
+
+		r.Post(`/updates/`, metricBatchHandler.ServeHTTP)
+
+		r.Route(`/value`, func(r chi.Router) {
+			r.Post(`/`, getMetricHandler.ServeHTTP)
+			r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
+		})
+
+		r.Get(`/ping`, pingHandler.ServeHTTP)
 	})
-
-	router.Post(`/updates/`, metricBatchHandler.ServeHTTP)
-
-	router.Route(`/value`, func(r chi.Router) {
-		r.Post(`/`, getMetricHandler.ServeHTTP)
-		r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
-	})
-
-	router.Get(`/ping`, pingHandler.ServeHTTP)
 
 	return router, storage
 }

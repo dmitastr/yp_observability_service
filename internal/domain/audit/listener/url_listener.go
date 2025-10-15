@@ -26,7 +26,9 @@ func (l *URLListener) Notify(data *data.Data) error {
 
 	r, err := l.client.Post(l.url, "application/json", &postData)
 	defer func() {
-		_ = r.Body.Close()
+		if r != nil && r.Body != nil {
+			_ = r.Body.Close()
+		}
 	}()
 
 	return err
