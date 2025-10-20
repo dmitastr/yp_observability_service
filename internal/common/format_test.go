@@ -1,4 +1,4 @@
-package formattools
+package common
 
 import (
 	"testing"

@@ -6,6 +6,11 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
+	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
+	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
+	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
+	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
+	"github.com/dmitastr/yp_observability_service/internal/repository/postgres_storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -16,10 +21,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	db "github.com/dmitastr/yp_observability_service/internal/datasources/database"
-	filestorage "github.com/dmitastr/yp_observability_service/internal/datasources/file_storage"
-	postgresstorage "github.com/dmitastr/yp_observability_service/internal/datasources/postgres_storage"
-	postgrespinger "github.com/dmitastr/yp_observability_service/internal/domain/postgres_pinger"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
@@ -29,9 +30,10 @@ import (
 	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
 	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
-	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository/database"
 )
 
+// NewServer creates a new server, register all handlers and middleware
+// and inject necessary dependencies
 func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	var storage dbinterface.Database
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
@@ -42,7 +44,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
 		if err != nil {
-			logger.GetLogger().Panicf("couldn't connect to postgres database: ", err)
+			logger.Panicf("couldn't connect to postgres memstorage: ", err)
 		}
 	}
 	storage.Init()
@@ -73,8 +75,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	router.Mount("/debug", middleware.Profiler())
 
 	router.Group(func(r chi.Router) {
-		r.Use(compress.CompressMiddleware)
 		// setting routes
+		r.Use(compress.CompressMiddleware)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
 
 		r.Route(`/update`, func(r chi.Router) {
@@ -83,7 +85,6 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		})
 
 		r.Post(`/updates/`, metricBatchHandler.ServeHTTP)
-
 		r.Route(`/value`, func(r chi.Router) {
 			r.Post(`/`, getMetricHandler.ServeHTTP)
 			r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
@@ -95,7 +96,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	return router, storage
 }
 
-func Execute() error {
+// Run initialized [cobra.Command] for args parsing and starts the server
+func Run() error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability service",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,13 +106,13 @@ func Execute() error {
 			var cfg serverenvconfig.Config
 			// Unmarshal the configuration into the Config struct
 			if err := viper.Unmarshal(&cfg); err != nil {
-				logger.GetLogger().Errorf("Unable to decode into struct, %v\n", err)
+				logger.Errorf("Unable to decode into struct, %v\n", err)
 				return err
 			}
 			router, postgresDB := NewServer(cfg)
 			defer postgresDB.Close()
 
-			logger.GetLogger().Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
+			logger.Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
 			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 				return err
 			}
@@ -123,7 +125,7 @@ func Execute() error {
 	rootCmd.Flags().Int("i", 300, "interval for storing data to the file in seconds, 0=stream writing")
 	rootCmd.Flags().Bool("r", false, "restore data from file")
 	rootCmd.Flags().String("f", "./data/data.json", "path for writing data")
-	rootCmd.Flags().String("d", "", "database connection url")
+	rootCmd.Flags().String("d", "", "memstorage connection url")
 	rootCmd.Flags().String("k", "", "key for request signing")
 	rootCmd.Flags().String("audit-file", "", "file path for audit logs")
 	rootCmd.Flags().String("audit-url", "", "url for audit logs")
