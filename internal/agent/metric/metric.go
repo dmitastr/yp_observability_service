@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
+	formattools "github.com/dmitastr/yp_observability_service/internal/common"
 )
 
 type Metric interface {

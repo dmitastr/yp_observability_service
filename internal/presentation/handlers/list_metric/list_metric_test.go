@@ -6,14 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/domain/entity"
+	"github.com/dmitastr/yp_observability_service/internal/domain/model"
 	"github.com/dmitastr/yp_observability_service/internal/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestListMetricsHandler_ServeHTTP(t *testing.T) {
-	metrics := []entity.DisplayMetric{{Name: "abc", Type: "gauge", StringValue: "10"}}
+	metrics := []models.DisplayMetric{{Name: "abc", Type: "gauge", StringValue: "10"}}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

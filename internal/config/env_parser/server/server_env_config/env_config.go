@@ -19,7 +19,7 @@ type Config struct {
 func New(address string, storeInterval int, fileStoragePath string, restore bool, dbURL, key string) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
-		logger.GetLogger().Errorf("error while reading env variables=%s", err)
+		logger.Errorf("error while reading env variables=%s", err)
 	}
 	if cfg.Address == nil {
 		cfg.Address = &address

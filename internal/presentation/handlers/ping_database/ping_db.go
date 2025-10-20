@@ -5,17 +5,19 @@ import (
 	"net/http"
 	"time"
 
-	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
 )
 
+// PingDatabaseHandler handles requests for checking database health
 type PingDatabaseHandler struct {
-	service srv.ServiceAbstract
+	service srv.IService
 }
 
-func New(service srv.ServiceAbstract) *PingDatabaseHandler {
+func New(service srv.IService) *PingDatabaseHandler {
 	return &PingDatabaseHandler{service: service}
 }
 
+// ServeHTTP accepts GET requests and  checks if database answers to ping command
 func (handler PingDatabaseHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()

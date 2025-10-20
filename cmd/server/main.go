@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	if err := server.Execute(); err != nil {
+	if err := server.Run(); err != nil {
 		panic(err)
 	}
 }

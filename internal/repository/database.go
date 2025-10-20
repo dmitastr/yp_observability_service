@@ -1,9 +1,9 @@
-package database
+package repository
 
 import (
 	"context"
 
-	models "github.com/dmitastr/yp_observability_service/internal/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/model"
 )
 
 type Database interface {

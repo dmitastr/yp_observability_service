@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dmitastr/yp_observability_service/internal/domain/model"
 	"github.com/dmitastr/yp_observability_service/internal/mocks"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

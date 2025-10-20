@@ -1,6 +1,8 @@
-package backupmanager
+package repository
 
-import models "github.com/dmitastr/yp_observability_service/internal/model"
+import (
+	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+)
 
 type BackupManager interface {
 	RunBackup(func() []models.Metrics)

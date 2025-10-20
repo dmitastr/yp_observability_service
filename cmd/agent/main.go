@@ -26,7 +26,7 @@ func main() {
 	flag.Parse()
 	cfg := agentenvconfig.New(serverAddress, pollInterval, reportInterval, key, rateLimit)
 
-	logger.GetLogger().Infof("Starting client for server=%s, poll interval=%d, report interval=%d",
+	logger.Infof("Starting client for server=%s, poll interval=%d, report interval=%d",
 		*cfg.Address,
 		*cfg.PollInterval,
 		*cfg.ReportInterval,

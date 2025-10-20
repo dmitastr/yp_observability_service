@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/dmitastr/yp_observability_service/internal/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/model"
 )
 
 type Data struct {

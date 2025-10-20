@@ -4,9 +4,8 @@ import (
 	"strconv"
 	"testing"
 
+	formattools "github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
 
 func TestGaugeMetric_ToString(t *testing.T) {

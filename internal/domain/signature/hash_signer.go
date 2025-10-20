@@ -8,6 +8,7 @@ import (
 	"fmt"
 )
 
+// HashSigner can encode and decode message with specific key
 type HashSigner struct {
 	Key *string
 }
@@ -32,6 +33,7 @@ func (hs *HashSigner) Encode(src []byte) string {
 	return hex.EncodeToString(src)
 }
 
+// GenerateSignature signs bytes data with key using sha256 method
 func (hs *HashSigner) GenerateSignature(body []byte) (string, error) {
 	if !hs.KeyExist() {
 		return "", errors.New("key does not exist")

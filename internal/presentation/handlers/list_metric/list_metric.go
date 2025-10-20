@@ -9,18 +9,21 @@ import (
 	"strings"
 	"time"
 
-	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
+// ListMetricsHandler handles requests for getting a list of all metrics
 type ListMetricsHandler struct {
-	service srv.ServiceAbstract
+	service srv.IService
 }
 
-func NewHandler(s srv.ServiceAbstract) *ListMetricsHandler {
+func NewHandler(s srv.IService) *ListMetricsHandler {
 	return &ListMetricsHandler{service: s}
 }
 
+// ServeHTTP accept GET requests, fetching a list of all metrics from db and
+// rendering them as html table
 func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		res.WriteHeader(http.StatusMethodNotAllowed)
@@ -36,7 +39,7 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logger.GetLogger().Infof("Receive %d metrics from db", len(metrics))
+	logger.Infof("Receive %d metrics from db", len(metrics))
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -49,7 +52,7 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	templatePath := filepath.Join(parentPath, "web", "templates", "index.html")
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
-		logger.GetLogger().Error(err)
+		logger.Error(err)
 		http.Error(res, "Template parsing error", http.StatusInternalServerError)
 		return
 	}
