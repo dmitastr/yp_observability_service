@@ -10,7 +10,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
-var EXCLUDE_PATH_OUT = []string{
+var excludePathOut = []string{
 	`.*value.*`,
 }
 
@@ -78,7 +78,7 @@ func pathNoCompression(path string) bool {
 	var match bool
 	var err error
 
-	for _, v := range EXCLUDE_PATH_OUT {
+	for _, v := range excludePathOut {
 		match, err = regexp.Match(v, []byte(path))
 		if err != nil {
 			logger.Errorf("PathCheck regexp err: %v", err)
