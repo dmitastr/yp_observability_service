@@ -57,6 +57,7 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 		return
 	}
 
+	res.Header().Set("Content-Type", "text/html")
 	res.WriteHeader(http.StatusOK)
 	err = t.Execute(res, metrics)
 	if err != nil {

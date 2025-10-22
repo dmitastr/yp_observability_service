@@ -5,14 +5,15 @@ import (
 	"io"
 	"net/http"
 	"strings"
-)
 
-const bodySizeForCompression int = 100
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+)
 
 // CompressWriter implements [http.ResponseWriter] interface and is used to compress response
 type CompressWriter struct {
-	rw http.ResponseWriter
-	gz *gzip.Writer
+	rw   http.ResponseWriter
+	gz   *gzip.Writer
+	code int
 }
 
 func NewCompressWriter(res http.ResponseWriter) *CompressWriter {
@@ -21,10 +22,8 @@ func NewCompressWriter(res http.ResponseWriter) *CompressWriter {
 
 // Write compress the data and writes it to the original [http.ResponseWriter]
 func (c *CompressWriter) Write(p []byte) (int, error) {
-	if len(p) > bodySizeForCompression {
-		return c.gz.Write(p)
-	}
-	return c.rw.Write(p)
+	c.rw.Header().Set("Content-Encoding", "gzip")
+	return c.gz.Write(p)
 }
 
 // Header gets [http.Header] to implement [http.ResponseWriter] interface
@@ -34,9 +33,6 @@ func (c *CompressWriter) Header() http.Header {
 
 // WriteHeader checks status code and adds Content-encoding header to the response
 func (c *CompressWriter) WriteHeader(statusCode int) {
-	if statusCode < 600 {
-		c.rw.Header().Set("Content-Encoding", "gzip")
-	}
 	c.rw.WriteHeader(statusCode)
 }
 
@@ -53,6 +49,7 @@ type CompressReader struct {
 func NewCompressReader(reader io.ReadCloser) (c *CompressReader, err error) {
 	gz, err := gzip.NewReader(reader)
 	if err != nil {
+		logger.Errorf("error creating gzip reader: %v", err)
 		return
 	}
 	c = &CompressReader{r: reader, gz: gz}
@@ -72,6 +69,14 @@ func (c *CompressReader) Close() error {
 	return c.gz.Close()
 }
 
+// SetReader checks if request was compressed and set reader for decompression
+func (c *CompressReader) SetReader(req *http.Request) {
+	contentEncoding := req.Header.Get("Content-Encoding")
+	if strings.Contains(contentEncoding, "gzip") {
+		req.Body = c
+	}
+}
+
 // CompressMiddleware is a middleware that handles compression and decompression if appropriate headers are set
 func CompressMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -80,7 +85,8 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		if strings.Contains(contentEncoding, "gzip") {
 			cr, err := NewCompressReader(req.Body)
 			if err != nil {
-				res.WriteHeader(http.StatusInternalServerError)
+				logger.Errorf("error creating compress reader: %v", err)
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 			req.Body = cr
@@ -94,5 +100,23 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(useWriter, req)
+	})
+}
+
+// DecompressMiddleware checks if request was compressed and set reader for decompression
+func DecompressMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		contentEncoding := req.Header.Get("Content-Encoding")
+		if strings.Contains(contentEncoding, "gzip") {
+			cr, err := NewCompressReader(req.Body)
+			if err != nil {
+				logger.Errorf("error creating compress reader: %v", err)
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			req.Body = cr
+		}
+
+		next.ServeHTTP(res, req)
 	})
 }

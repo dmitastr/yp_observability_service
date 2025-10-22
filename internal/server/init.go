@@ -73,9 +73,8 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 
 	// Set path for profiling
 	router.Mount("/debug", middleware.Profiler())
-
+	// setting routes
 	router.Group(func(r chi.Router) {
-		// setting routes
 		r.Use(compress.CompressMiddleware)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
 
@@ -85,12 +84,18 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 		})
 
 		r.Post(`/updates/`, metricBatchHandler.ServeHTTP)
+		r.Get(`/ping`, pingHandler.ServeHTTP)
+
+	})
+
+	router.Group(func(r chi.Router) {
+		r.Use(compress.DecompressMiddleware)
+
 		r.Route(`/value`, func(r chi.Router) {
 			r.Post(`/`, getMetricHandler.ServeHTTP)
 			r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
 		})
 
-		r.Get(`/ping`, pingHandler.ServeHTTP)
 	})
 
 	return router, storage
