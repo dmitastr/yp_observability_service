@@ -7,7 +7,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/data"
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"

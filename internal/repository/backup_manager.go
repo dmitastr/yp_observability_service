@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 )
 
 type BackupManager interface {

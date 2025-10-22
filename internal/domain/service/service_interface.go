@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 

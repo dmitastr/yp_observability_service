@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	backupmanager "github.com/dmitastr/yp_observability_service/internal/repository"
@@ -83,7 +83,7 @@ func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) er
 	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
 		if metric.Delta != nil {
-			newMetric.DeltaSet(metric.Delta)
+			newMetric.UpdateDelta(metric.Delta)
 		}
 	}
 	storage.Metrics[newMetric.ID] = newMetric

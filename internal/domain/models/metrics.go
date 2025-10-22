@@ -29,13 +29,18 @@ func FromUpdate(upd update.MetricUpdate) (m Metrics) {
 	return
 }
 
-// DeltaSet increment Delta value or set it if it's nil
-func (m *Metrics) DeltaSet(value *int64) {
+// UpdateDelta increment Delta value or set it if it's nil
+func (m *Metrics) UpdateDelta(value *int64) {
 	if m.Delta == nil {
 		m.Delta = value
 		return
 	}
 	*m.Delta += *value
+}
+
+// SetValue updates value field of a metric
+func (m *Metrics) SetValue(value *float64) {
+	*m.Value = *value
 }
 
 // GetValueString select metric value based on its type and converts it to string

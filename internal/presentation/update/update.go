@@ -8,7 +8,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 )
 
-// MetricUpdate is used to convert json data or path values from request to model
+// MetricUpdate is used to convert json data or path values from request to models
 type MetricUpdate struct {
 	MType       string `json:"type"`
 	MetricName  string `json:"id"`

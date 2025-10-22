@@ -6,7 +6,7 @@ import (
 	"time"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 

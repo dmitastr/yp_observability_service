@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
-	"github.com/dmitastr/yp_observability_service/internal/domain/model"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
 )
 

@@ -4,15 +4,10 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
-
-	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
-var excludePathOut = []string{
-	`.*value.*`,
-}
+const bodySizeForCompression int = 100
 
 // CompressWriter implements [http.ResponseWriter] interface and is used to compress response
 type CompressWriter struct {
@@ -26,7 +21,10 @@ func NewCompressWriter(res http.ResponseWriter) *CompressWriter {
 
 // Write compress the data and writes it to the original [http.ResponseWriter]
 func (c *CompressWriter) Write(p []byte) (int, error) {
-	return c.gz.Write(p)
+	if len(p) > bodySizeForCompression {
+		return c.gz.Write(p)
+	}
+	return c.rw.Write(p)
 }
 
 // Header gets [http.Header] to implement [http.ResponseWriter] interface
@@ -74,20 +72,6 @@ func (c *CompressReader) Close() error {
 	return c.gz.Close()
 }
 
-func pathNoCompression(path string) bool {
-	var match bool
-	var err error
-
-	for _, v := range excludePathOut {
-		match, err = regexp.Match(v, []byte(path))
-		if err != nil {
-			logger.Errorf("PathCheck regexp err: %v", err)
-			return match
-		}
-	}
-	return match
-}
-
 // CompressMiddleware is a middleware that handles compression and decompression if appropriate headers are set
 func CompressMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -103,7 +87,7 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		}
 
 		acceptEncoding := req.Header.Get("Accept-Encoding")
-		if strings.Contains(acceptEncoding, "gzip") && !pathNoCompression(req.URL.Path) {
+		if strings.Contains(acceptEncoding, "gzip") {
 			cw := NewCompressWriter(res)
 			useWriter = cw
 			defer cw.Close()
