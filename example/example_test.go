@@ -77,29 +77,31 @@ func Example() {
 
 	client := server.Client()
 	var err error
-	var resp *http.Response
 
 	// ping server status
-	resp, err = client.Get(server.URL + `/ping`)
+	respPing, err := client.Get(server.URL + `/ping`)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(resp.Status)
+	defer respPing.Body.Close()
+	fmt.Println(respPing.Status)
 
 	// update single metric
-	resp, err = client.Post(server.URL+"/update", "application/json", strings.NewReader(metricPost))
+	respUpdate, err := client.Post(server.URL+"/update", "application/json", strings.NewReader(metricPost))
 	if err != nil {
 		return
 	}
-	fmt.Println(resp.Status)
+	defer respUpdate.Body.Close()
+	fmt.Println(respUpdate.Status)
 
 	// update several metrics
-	resp, err = client.Post(server.URL+"/updates", "application/json", strings.NewReader(metricPostBatch))
+	respUpdates, err := client.Post(server.URL+"/updates", "application/json", strings.NewReader(metricPostBatch))
 	if err != nil {
 		return
 	}
-	fmt.Println(resp.Status)
+	defer respUpdates.Body.Close()
+	fmt.Println(respUpdates.Status)
 
 	// get single metric
 	respGet, err := client.Post(server.URL+"/value", "application/json", strings.NewReader(metricGet))
