@@ -3,12 +3,14 @@ package listener
 import (
 	"encoding/json"
 	"os"
+	"sync"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/data"
 )
 
 type FileListener struct {
 	path string
+	mu   sync.Mutex
 }
 
 func NewFileListener(path string) *FileListener {
@@ -16,6 +18,9 @@ func NewFileListener(path string) *FileListener {
 }
 
 func (fl *FileListener) Notify(data *data.Data) error {
+	fl.mu.Lock()
+	defer fl.mu.Unlock()
+
 	existData, err := fl.LoadFile()
 	if err != nil {
 		return err

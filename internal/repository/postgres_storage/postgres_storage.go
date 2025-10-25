@@ -186,29 +186,17 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 }
 
 func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
-	var metric models.Metrics
-
-	query := `SELECT name, mtype, value, delta FROM metrics WHERE name=@name`
-
-	err := pg.db.QueryRow(ctx, query, pgx.NamedArgs{"name": name}).Scan(&metric.ID, &metric.MType, &metric.Value, &metric.Delta)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query metrics: %v", err)
-	}
-	return &metric, nil
-
-	/*
-		var metric *models.Metrics
-		fun := func(tx pgx.Tx) error {
-			m, err := pg.getWithinTx(ctx, name, tx)
-			if err != nil {
-				return fmt.Errorf("unable to query metrics: %w", err)
-			}
-			metric = m
-			return nil
+	var metric *models.Metrics
+	fun := func(tx pgx.Tx) error {
+		m, err := pg.getWithinTx(ctx, name, tx)
+		if err != nil {
+			return fmt.Errorf("unable to query metrics: %w", err)
 		}
-		err := pg.ExecuteTX(ctx, pg.db, fun)
-		return metric, err
-	*/
+		metric = m
+		return nil
+	}
+	err := pg.ExecuteTX(ctx, pg.db, fun)
+	return metric, err
 }
 
 func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
