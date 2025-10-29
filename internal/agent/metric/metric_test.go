@@ -4,11 +4,9 @@ import (
 	"strconv"
 	"testing"
 
+	formattools "github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dmitastr/yp_observability_service/internal/format_tools"
 )
-
 
 func TestGaugeMetric_ToString(t *testing.T) {
 	tests := []struct {
@@ -18,7 +16,7 @@ func TestGaugeMetric_ToString(t *testing.T) {
 	}{
 		{
 			name: "valid input",
-			m: NewGaugeMetric("abc", 10.0),
+			m:    NewGaugeMetric("abc", 10.0),
 			want: []string{"abc", "gauge", formattools.FormatFloatTrimZero(10.0)},
 		},
 	}
@@ -38,7 +36,7 @@ func TestCounterMetric_ToString(t *testing.T) {
 	}{
 		{
 			name: "valid input",
-			m: NewCounterMetric("abc", 10),
+			m:    NewCounterMetric("abc", 10),
 			want: []string{"abc", "counter", strconv.FormatInt(10, 10)},
 		},
 	}
@@ -52,33 +50,33 @@ func TestCounterMetric_ToString(t *testing.T) {
 
 func TestGaugeMetric_UpdateValue(t *testing.T) {
 	tests := []struct {
-		name string
-		m    *GaugeMetric
-		newValue any
+		name      string
+		m         *GaugeMetric
+		newValue  any
 		wantValue float64
-		wantErr bool
+		wantErr   bool
 	}{
 		{
-			name: "valid input",
-			m: NewGaugeMetric("abc", 10),
-			newValue: 20.0,
+			name:      "valid input",
+			m:         NewGaugeMetric("abc", 10),
+			newValue:  20.0,
 			wantValue: 20.0,
-			wantErr: false,
+			wantErr:   false,
 		},
 		{
-			name: "input is not valid number",
-			m: NewGaugeMetric("abc", 10),
-			newValue: "10",
+			name:      "input is not valid number",
+			m:         NewGaugeMetric("abc", 10),
+			newValue:  "10",
 			wantValue: 0,
-			wantErr: true,
+			wantErr:   true,
 		},
-		
+
 		{
-			name: "input is not float64",
-			m: NewGaugeMetric("abc", 10),
-			newValue: 10,
+			name:      "input is not float64",
+			m:         NewGaugeMetric("abc", 10),
+			newValue:  10,
 			wantValue: 0,
-			wantErr: true,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
@@ -92,37 +90,36 @@ func TestGaugeMetric_UpdateValue(t *testing.T) {
 		})
 	}
 }
-
 
 func TestCounterMetric_UpdateValue(t *testing.T) {
 	tests := []struct {
-		name string
-		m    *CounterMetric
-		newValue any
+		name      string
+		m         *CounterMetric
+		newValue  any
 		wantValue int64
-		wantErr bool
+		wantErr   bool
 	}{
 		{
-			name: "valid input",
-			m: NewCounterMetric("abc", 10),
-			newValue: int64(20),
+			name:      "valid input",
+			m:         NewCounterMetric("abc", 10),
+			newValue:  int64(20),
 			wantValue: 30,
-			wantErr: false,
+			wantErr:   false,
 		},
 		{
-			name: "input is not valid number",
-			m: NewCounterMetric("abc", 10),
-			newValue: "20",
+			name:      "input is not valid number",
+			m:         NewCounterMetric("abc", 10),
+			newValue:  "20",
 			wantValue: 0,
-			wantErr: true,
+			wantErr:   true,
 		},
-		
+
 		{
-			name: "input is not int64",
-			m: NewCounterMetric("abc", 10),
-			newValue: 10,
+			name:      "input is not int64",
+			m:         NewCounterMetric("abc", 10),
+			newValue:  10,
 			wantValue: 0,
-			wantErr: true,
+			wantErr:   true,
 		},
 	}
 	for _, tt := range tests {
@@ -137,18 +134,17 @@ func TestCounterMetric_UpdateValue(t *testing.T) {
 	}
 }
 
-
 func TestCounterMetric_GetValue(t *testing.T) {
 	tests := []struct {
-		name string
-		m    *CounterMetric
-		key string
+		name      string
+		m         *CounterMetric
+		key       string
 		wantValue any
 	}{
 		{
-			name: "valid input",
-			m: NewCounterMetric("abc", 10),
-			key: "abc",
+			name:      "valid input",
+			m:         NewCounterMetric("abc", 10),
+			key:       "abc",
 			wantValue: int64(10),
 		},
 	}
@@ -159,18 +155,17 @@ func TestCounterMetric_GetValue(t *testing.T) {
 	}
 }
 
-
 func TestGaugeMetric_GetValue(t *testing.T) {
 	tests := []struct {
-		name string
-		m    *GaugeMetric
-		key string
+		name      string
+		m         *GaugeMetric
+		key       string
 		wantValue any
 	}{
 		{
-			name: "valid input",
-			m: NewGaugeMetric("abc", 10),
-			key: "abc",
+			name:      "valid input",
+			m:         NewGaugeMetric("abc", 10),
+			key:       "abc",
 			wantValue: 10.0,
 		},
 	}

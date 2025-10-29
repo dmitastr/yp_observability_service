@@ -5,13 +5,12 @@
 package mocks
 
 import (
-	context "context"
-	reflect "reflect"
+	"context"
+	"reflect"
 
-	entity "github.com/dmitastr/yp_observability_service/internal/domain/entity"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
-	update "github.com/dmitastr/yp_observability_service/internal/presentation/update"
-	gomock "github.com/golang/mock/gomock"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	"github.com/golang/mock/gomock"
 )
 
 // MockServiceAbstract is a mock of ServiceAbstract interface.
@@ -52,10 +51,10 @@ func (mr *MockServiceAbstractMockRecorder) BatchUpdate(arg0, arg1 interface{}) *
 }
 
 // GetAll mocks base method.
-func (m *MockServiceAbstract) GetAll(arg0 context.Context) ([]entity.DisplayMetric, error) {
+func (m *MockServiceAbstract) GetAll(arg0 context.Context) ([]models.DisplayMetric, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll", arg0)
-	ret0, _ := ret[0].([]entity.DisplayMetric)
+	ret0, _ := ret[0].([]models.DisplayMetric)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

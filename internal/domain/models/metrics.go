@@ -4,23 +4,14 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
-	formattools "github.com/dmitastr/yp_observability_service/internal/format_tools"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	"github.com/jackc/pgx/v5"
 )
 
-const (
-	Counter = "counter"
-	Gauge   = "gauge"
-)
-
-// NOTE: Не усложняем пример, вводя иерархическую вложенность структур.
-// Органичиваясь плоской моделью.
-// Delta и Value объявлены через указатели,
-// что бы отличать значение "0", от не заданного значения
-// и соответственно не кодировать в структуру.
+// Metrics stores information about a single metric. Delta and Value are pointers to distinguish nil value from 0
 type Metrics struct {
 	ID    string   `json:"id" db:"name"`
 	MType string   `json:"type" db:"mtype"`
@@ -29,6 +20,7 @@ type Metrics struct {
 	Hash  string   `json:"-" db:"-"`
 }
 
+// FromUpdate converts [update.MetricUpdate] to [Metrics]
 func FromUpdate(upd update.MetricUpdate) (m Metrics) {
 	m.Delta = upd.Delta
 	m.Value = upd.Value
@@ -37,7 +29,8 @@ func FromUpdate(upd update.MetricUpdate) (m Metrics) {
 	return
 }
 
-func (m *Metrics) DeltaSet(value *int64) {
+// UpdateDelta increment Delta value or set it if it's nil
+func (m *Metrics) UpdateDelta(value *int64) {
 	if m.Delta == nil {
 		m.Delta = value
 		return
@@ -45,12 +38,23 @@ func (m *Metrics) DeltaSet(value *int64) {
 	*m.Delta += *value
 }
 
+// SetValue updates value field of a metric
+func (m *Metrics) SetValue(value *float64) {
+	*m.Value = *value
+}
+
+// GetValueString select metric value based on its type and converts it to string
 func (m *Metrics) GetValueString() (val string, err error) {
-	if m.Delta != nil {
-		val = strconv.FormatInt(*m.Delta, 10)
-	} else if m.Value != nil {
-		val = formattools.FormatFloatTrimZero(*m.Value)
-	} else {
+	switch m.MType {
+	case common.GAUGE:
+		if m.Value != nil {
+			val = common.FormatFloatTrimZero(*m.Value)
+		}
+	case common.COUNTER:
+		if m.Delta != nil {
+			val = strconv.FormatInt(*m.Delta, 10)
+		}
+	default:
 		err = errs.ErrorValueFromEmptyMetric
 	}
 	return val, err
@@ -59,12 +63,13 @@ func (m *Metrics) GetValueString() (val string, err error) {
 func (m *Metrics) String() string {
 	strVal, err := m.GetValueString()
 	if err != nil {
-		logger.GetLogger().Error(err)
+		logger.Error(err)
 		return ""
 	}
 	return fmt.Sprintf("name=%s, type=%s, value=%s", m.ID, m.MType, strVal)
 }
 
+// ToNamedArgs converts [Metric] to [pgx.NamedArgs] for SQL query
 func (m *Metrics) ToNamedArgs() pgx.NamedArgs {
 	args := pgx.NamedArgs{
 		"name":  m.ID,

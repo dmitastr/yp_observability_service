@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 )
 
-const (
-	GAUGE   = "gauge"
-	COUNTER = "counter"
-)
-
+// MetricUpdate is used to convert json data or path values from request to models
 type MetricUpdate struct {
 	MType       string `json:"type"`
 	MetricName  string `json:"id"`
@@ -20,6 +17,7 @@ type MetricUpdate struct {
 	Delta       *int64   `json:"delta,omitempty"`
 }
 
+// New returns new [MetricUpdate] and parse value from string based on metric type
 func New(name, mtype, valueStr string) (metric MetricUpdate, err error) {
 	metric.MetricName = name
 	metric.MType = mtype
@@ -30,13 +28,13 @@ func New(name, mtype, valueStr string) (metric MetricUpdate, err error) {
 	}
 
 	switch mtype {
-	case GAUGE:
+	case common.GAUGE:
 		meticValue, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
 			return metric, err
 		}
 		metric.Value = &meticValue
-	case COUNTER:
+	case common.COUNTER:
 		meticValue, err := strconv.ParseInt(valueStr, 10, 64)
 		if err != nil {
 			return metric, err

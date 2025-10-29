@@ -6,8 +6,8 @@ import (
 	"time"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
 )
 
 type FileStorage struct {
@@ -24,7 +24,7 @@ func (fs *FileStorage) SaveData(fnc func() []models.Metrics) {
 	for range ticker.C {
 		metrics := fnc()
 		if err := fs.Flush(metrics); err != nil {
-			logger.GetLogger().Errorf("Error while saving data to a file: %v", err)
+			logger.Errorf("Error while saving data to a file: %v", err)
 		}
 	}
 }
@@ -36,7 +36,7 @@ func (fs *FileStorage) RunBackup(fnc func() []models.Metrics) {
 func (fs *FileStorage) createFile() *os.File {
 	file, err := os.Create(fs.FileName)
 	if err != nil {
-		logger.GetLogger().Errorf("error while creating file '%s': %v", fs.FileName, err)
+		logger.Errorf("error while creating file '%s': %v", fs.FileName, err)
 	}
 	return file
 }
@@ -45,7 +45,7 @@ func (fs *FileStorage) Flush(metrics []models.Metrics) error {
 	file := fs.createFile()
 	defer file.Close()
 	if err := json.NewEncoder(file).Encode(metrics); err != nil {
-		logger.GetLogger().Error(err)
+		logger.Error(err)
 		return err
 	}
 	return nil
@@ -54,13 +54,13 @@ func (fs *FileStorage) Flush(metrics []models.Metrics) error {
 func (fs *FileStorage) Load() (metrics []models.Metrics, err error) {
 	file, err := os.Open(fs.FileName)
 	if err != nil {
-		logger.GetLogger().Infof("error while opening file '%s': %s", fs.FileName, err)
+		logger.Infof("error while opening file '%s': %s", fs.FileName, err)
 		return metrics, err
 	}
 	defer file.Close()
 
 	if err = json.NewDecoder(file).Decode(&metrics); err != nil {
-		logger.GetLogger().Error(err)
+		logger.Error(err)
 		return
 	}
 	return

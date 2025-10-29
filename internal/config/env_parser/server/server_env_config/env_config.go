@@ -6,18 +6,20 @@ import (
 )
 
 type Config struct {
-	Address         *string `env:"ADDRESS"`
-	StoreInterval   *int    `env:"STORE_INTERVAL"`
-	FileStoragePath *string `env:"FILE_STORAGE_PATH"`
-	Restore         *bool   `env:"RESTORE"`
-	DBUrl           *string `env:"DATABASE_DSN"`
-	Key             *string `env:"KEY"`
+	Address         *string `env:"ADDRESS" mapstructure:"a"`
+	StoreInterval   *int    `env:"STORE_INTERVAL" mapstructure:"i"`
+	FileStoragePath *string `env:"FILE_STORAGE_PATH" mapstructure:"f"`
+	Restore         *bool   `env:"RESTORE" mapstructure:"r"`
+	DBUrl           *string `env:"DATABASE_DSN" mapstructure:"d"`
+	Key             *string `env:"KEY" mapstructure:"k"`
+	AuditFile       *string `env:"AUDIT_FILE" mapstructure:"audit-file"`
+	AuditURL        *string `env:"AUDIT_URL" mapstructure:"audit-url"`
 }
 
 func New(address string, storeInterval int, fileStoragePath string, restore bool, dbURL, key string) (cfg Config) {
 	err := env.Parse(&cfg)
 	if err != nil {
-		logger.GetLogger().Errorf("error while reading env variables=%s", err)
+		logger.Errorf("error while reading env variables=%s", err)
 	}
 	if cfg.Address == nil {
 		cfg.Address = &address

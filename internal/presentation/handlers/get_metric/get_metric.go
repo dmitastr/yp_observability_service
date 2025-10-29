@@ -6,20 +6,24 @@ import (
 	"net/http"
 	"time"
 
-	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
+// GetMetricHandler handles the requests for getting single metric
 type GetMetricHandler struct {
-	service srv.ServiceAbstract
+	service srv.IService
 }
 
-func NewHandler(s srv.ServiceAbstract) *GetMetricHandler {
+func NewHandler(s srv.IService) *GetMetricHandler {
 	return &GetMetricHandler{service: s}
 }
 
+// ServeHTTP handles the request, supports methods:
+//   - POST - accept json data, returns json
+//   - GET - accept path params {mtype}/{name}, returns metrics value in the body
 func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var upd update.MetricUpdate
 
@@ -31,7 +35,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 	case http.MethodPost:
 		if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		upd.MetricValue = "1"
 	default:
@@ -39,7 +43,7 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	logger.GetLogger().Infof("receive update=%s", upd)
+	logger.Infof("receive update=%s", upd)
 
 	if !upd.IsValid() {
 		http.Error(res, errs.ErrorWrongPath.Error(), http.StatusNotFound)
@@ -64,13 +68,13 @@ func (handler GetMetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Req
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(valString))
 		return
-		
+
 	case http.MethodPost:
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(res).Encode(&metric); err != nil {
 			http.Error(res, err.Error(), http.StatusNotFound)
-			return	
+			return
 		}
 		return
 	default:

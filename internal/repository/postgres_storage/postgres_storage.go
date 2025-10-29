@@ -8,9 +8,9 @@ import (
 	"time"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	pgerrors "github.com/dmitastr/yp_observability_service/internal/datasources/postgres_storage/pg_err_classifier"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
+	"github.com/dmitastr/yp_observability_service/internal/repository/postgres_storage/pg_err_classifier"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,64 +56,64 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
     delta = metrics.delta + @delta `
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
-	
+
 	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
 	if err != nil {
-		logger.GetLogger().Fatalf("Failed to parse database config: %v", err)
+		logger.Fatalf("Failed to parse memstorage config: %v", err)
 	}
 	dbConfig.ConnConfig.Tracer = &tracelog.TraceLog{
 		Logger:   logger.GetLogger(),
 		LogLevel: tracelog.LogLevelInfo,
 	}
-	
+
 	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to db with url=%s: %v", *cfg.DBUrl, err)
 	}
-	logger.GetLogger().Info("Database connection established successfully")
-	
+	logger.Info("Database connection established successfully")
+
 	delayFunc := func(exec failsafe.ExecutionAttempt[any]) time.Duration {
 		return linearBackOff(exec.Attempts(), delaySlope, delayRise)
 	}
 	retry := retrypolicy.Builder[any]().HandleIf(func(_ any, err error) bool {
 		pgerrClassifier := pgerrors.NewPostgresErrorClassifier()
 		return pgerrClassifier.Classify(err) == pgerrors.Retriable
-		
-		}).WithMaxRetries(maxErrorRetries).
+
+	}).WithMaxRetries(maxErrorRetries).
 		WithDelayFunc(delayFunc).Build()
-		
-		pg := &Postgres{db: pool, retryPolicy: retry}
-		
-		return pg, nil
-	}
-	
+
+	pg := &Postgres{db: pool, retryPolicy: retry}
+
+	return pg, nil
+}
+
 func (pg *Postgres) Init() error {
 	db, err := sql.Open("postgres", pg.db.Config().ConnString())
 	if err != nil {
-		logger.GetLogger().Fatalf("Unable to connect to database: %v", err)
+		logger.Fatalf("Unable to connect to memstorage: %v", err)
 	}
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		logger.GetLogger().Fatal(err)
+		logger.Fatal(err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
 	if err != nil {
-		logger.GetLogger().Fatal(err)
+		logger.Fatal(err)
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		logger.GetLogger().Fatalf("Migration up failed: %v", err)
+		logger.Fatalf("Migration up failed: %v", err)
 	}
 	if err := db.Close(); err != nil {
 		return err
 	}
-	logger.GetLogger().Info("Migration up completed successfully")
+	logger.Info("Migration up completed successfully")
 	return nil
-	
+
 }
-	
+
 func (pg *Postgres) Ping(ctx context.Context) error {
 	return pg.db.Ping(ctx)
 }
@@ -124,7 +124,7 @@ func (pg *Postgres) Close() error {
 }
 
 func (pg *Postgres) ExecuteTX(ctx context.Context, conn Conn, fnc ExecuteWithRetryFunc) error {
-	//nolint: wrapcheck
+	// nolint: wrapcheck
 	return failsafe.NewExecutor(pg.retryPolicy).
 		WithContext(ctx).
 		RunWithExecution(func(exec failsafe.Execution[any]) (err error) { //nolint:contextcheck
@@ -154,7 +154,7 @@ func (pg *Postgres) Update(ctx context.Context, metric models.Metrics) error {
 
 		if _, err := tx.Exec(ctx, query, args); err != nil {
 			tx.Rollback(ctx)
-			logger.GetLogger().Errorf("unable to insert row: %v", err)
+			logger.Errorf("unable to insert row: %v", err)
 			return err
 		}
 		return nil
@@ -187,10 +187,9 @@ func (pg *Postgres) BulkUpdate(ctx context.Context, metrics []models.Metrics) er
 
 func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, error) {
 	var metric *models.Metrics
-
 	fun := func(tx pgx.Tx) error {
 		m, err := pg.getWithinTx(ctx, name, tx)
-			if err != nil {
+		if err != nil {
 			return fmt.Errorf("unable to query metrics: %w", err)
 		}
 		metric = m
@@ -214,8 +213,6 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return metrics, err
 }
 
-
-
 func (pg *Postgres) getWithinTx(ctx context.Context, name string, conn Cursor) (*models.Metrics, error) {
 	if conn == nil {
 		conn = pg.db
@@ -235,12 +232,12 @@ func (pg *Postgres) getAllWithinTx(ctx context.Context, conn Cursor) ([]models.M
 	if conn == nil {
 		conn = pg.db
 	}
-	
+
 	query := `SELECT name, mtype, value, delta FROM metrics`
 
 	rows, err := conn.Query(ctx, query)
 	if err != nil {
-		logger.GetLogger().Errorf("unable to query users: %v", err)
+		logger.Errorf("unable to query users: %v", err)
 		return nil, err
 	}
 	defer rows.Close()

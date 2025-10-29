@@ -5,61 +5,79 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
-type compressWriter struct {
-	rw http.ResponseWriter
-	gz *gzip.Writer
+// CompressWriter implements [http.ResponseWriter] interface and is used to compress response
+type CompressWriter struct {
+	rw   http.ResponseWriter
+	gz   *gzip.Writer
+	code int
 }
 
-func NewCompressWriter(res http.ResponseWriter) *compressWriter {
-	return &compressWriter{rw: res, gz: gzip.NewWriter(res)}
+func NewCompressWriter(res http.ResponseWriter) *CompressWriter {
+	return &CompressWriter{rw: res, gz: gzip.NewWriter(res)}
 }
 
-func (c *compressWriter) Write(p []byte) (int, error) {
+// Write compress the data and writes it to the original [http.ResponseWriter]
+func (c *CompressWriter) Write(p []byte) (int, error) {
+	c.rw.Header().Set("Content-Encoding", "gzip")
 	return c.gz.Write(p)
 }
 
-func (c *compressWriter) Header() http.Header {
+// Header gets [http.Header] to implement [http.ResponseWriter] interface
+func (c *CompressWriter) Header() http.Header {
 	return c.rw.Header()
 }
 
-func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 600 {
-		c.rw.Header().Set("Content-Encoding", "gzip")
-	}
+// WriteHeader checks status code and adds Content-encoding header to the response
+func (c *CompressWriter) WriteHeader(statusCode int) {
 	c.rw.WriteHeader(statusCode)
 }
 
-func (c *compressWriter) Close() error {
+func (c *CompressWriter) Close() error {
 	return c.gz.Close()
 }
 
-type compressReader struct {
-    r  io.ReadCloser
-    gz *gzip.Reader
+// CompressReader used for decompressing request
+type CompressReader struct {
+	r  io.ReadCloser
+	gz *gzip.Reader
 }
 
-func NewCompressReader(reader io.ReadCloser) (c *compressReader, err error) {
+func NewCompressReader(reader io.ReadCloser) (c *CompressReader, err error) {
 	gz, err := gzip.NewReader(reader)
 	if err != nil {
+		logger.Errorf("error creating gzip reader: %v", err)
 		return
 	}
-	c = &compressReader{r: reader, gz: gz}
+	c = &CompressReader{r: reader, gz: gz}
 	return
 }
 
-func (c *compressReader) Read(p []byte) (int, error) {
+// Read decompress the data and writes it to p
+func (c *CompressReader) Read(p []byte) (int, error) {
 	return c.gz.Read(p)
 }
 
-func (c *compressReader) Close() error {
+// Close closes the reader to avoid memory leakage
+func (c *CompressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return err
 	}
 	return c.gz.Close()
 }
 
+// SetReader checks if request was compressed and set reader for decompression
+func (c *CompressReader) SetReader(req *http.Request) {
+	contentEncoding := req.Header.Get("Content-Encoding")
+	if strings.Contains(contentEncoding, "gzip") {
+		req.Body = c
+	}
+}
+
+// CompressMiddleware is a middleware that handles compression and decompression if appropriate headers are set
 func CompressMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		useWriter := res
@@ -67,8 +85,9 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		if strings.Contains(contentEncoding, "gzip") {
 			cr, err := NewCompressReader(req.Body)
 			if err != nil {
-				res.WriteHeader(http.StatusInternalServerError)
-                return
+				logger.Errorf("error creating compress reader: %v", err)
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
 			}
 			req.Body = cr
 		}
@@ -81,5 +100,23 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(useWriter, req)
+	})
+}
+
+// DecompressMiddleware checks if request was compressed and set reader for decompression
+func DecompressMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		contentEncoding := req.Header.Get("Content-Encoding")
+		if strings.Contains(contentEncoding, "gzip") {
+			cr, err := NewCompressReader(req.Body)
+			if err != nil {
+				logger.Errorf("error creating compress reader: %v", err)
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			req.Body = cr
+		}
+
+		next.ServeHTTP(res, req)
 	})
 }

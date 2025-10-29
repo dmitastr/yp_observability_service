@@ -7,20 +7,23 @@ import (
 	"net/http"
 	"time"
 
-	srv "github.com/dmitastr/yp_observability_service/internal/domain/service_interface"
+	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 )
 
+// MetricHandler handles requests for updating metric value or creating a new one
 type MetricHandler struct {
-	service srv.ServiceAbstract
+	service srv.IService
 }
 
-func NewHandler(s srv.ServiceAbstract) *MetricHandler {
+func NewHandler(s srv.IService) *MetricHandler {
 	return &MetricHandler{service: s}
 }
 
+// ServeHTTP accepts POST requests. It accepts params from path /{mtype}/{name}/{value}, and if none checks for
+// request body. Metrics value is updated or new metric is created
 func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		res.WriteHeader(http.StatusMethodNotAllowed)
@@ -30,7 +33,7 @@ func (handler MetricHandler) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	mtype := req.PathValue("mtype")
 	name := req.PathValue("name")
 	value := req.PathValue("value")
-	logger.GetLogger().Infof("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
+	logger.Infof("Receive update: type=%s, name=%s, value=%s\n", mtype, name, value)
 
 	upd, err := update.New(name, mtype, value)
 	if err != nil {

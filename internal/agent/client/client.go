@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dmitastr/yp_observability_service/internal/domain/signature"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -24,7 +25,6 @@ import (
 	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
-	"github.com/dmitastr/yp_observability_service/internal/signature"
 )
 
 const (
@@ -191,12 +191,12 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 			return nil, err
 		}
 		if err := gw.Close(); err != nil {
-			logger.GetLogger().Errorf("failed to close gzip writer: %v", err)
+			logger.Errorf("failed to close gzip writer: %v", err)
 		}
 		compression = "gzip"
 	} else {
 		if _, err := postData.Write(data); err != nil {
-			logger.GetLogger().Errorf("failed to write uncompressed: %v", err)
+			logger.Errorf("failed to write uncompressed: %v", err)
 			return nil, err
 		}
 	}
@@ -209,7 +209,7 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 	if agent.HashSigner.KeyExist() {
 		hashSignature, err := agent.HashSigner.GenerateSignature(postData.Bytes())
 		if err != nil {
-			logger.GetLogger().Panicf("failed to generate hash signature: %v", err)
+			logger.Panicf("failed to generate hash signature: %v", err)
 		}
 		req.Header.Set(common.HashHeaderKey, hashSignature)
 	}
@@ -257,7 +257,7 @@ func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<-
 		resultCh <- Result{err: fmt.Errorf("failed to marshal metrics: %w", err)}
 		return err
 	}
-	logger.GetLogger().Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
+	logger.Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
 	postPath := agent.address + "/updates/"
 	resp, err := agent.Post(postPath, data, true)
@@ -271,12 +271,11 @@ func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<-
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		// logger.GetLogger().Errorf("failed to read response body: %v", err)
 		resultCh <- Result{err: fmt.Errorf("failed to read response body: %w", err)}
 	}
 	defer resp.Body.Close()
 
-	logger.GetLogger().Infof("Batch metrics response: status_code=%d, body=%s\n", resp.StatusCode, body)
+	logger.Infof("Batch metrics response: status_code=%d, body=%s\n", resp.StatusCode, body)
 	return nil
 }
 
@@ -289,7 +288,7 @@ func (agent *Agent) toList() (metrics []model.Metric) {
 
 func (agent *Agent) WorkerPoolCreation() error {
 	var wg sync.WaitGroup
-	logger.GetLogger().Infof("Starting worker pool creation")
+	logger.Infof("Starting worker pool creation")
 
 	metrics := agent.toList()
 
@@ -298,7 +297,7 @@ func (agent *Agent) WorkerPoolCreation() error {
 
 	for w := range agent.RateLimit {
 		wg.Add(1)
-		logger.GetLogger().Infof("Worker %d starting", w)
+		logger.Infof("Worker %d starting", w)
 		go func() {
 			_ = agent.SendMetricsBatch(inCh, resultCh)
 			wg.Done()
@@ -322,7 +321,7 @@ func (agent *Agent) WorkerPoolCreation() error {
 
 	for res := range resultCh {
 		if res.err != nil {
-			logger.GetLogger().Errorf("failed to send metrics batch: %v", res.err)
+			logger.Errorf("failed to send metrics batch: %v", res.err)
 		}
 	}
 	return nil
@@ -333,7 +332,7 @@ func (agent *Agent) SendData(reportInterval int) {
 	defer ticker.Stop()
 	for range ticker.C {
 		if err := agent.WorkerPoolCreation(); err != nil {
-			logger.GetLogger().Error(err)
+			logger.Error(err)
 		}
 	}
 }

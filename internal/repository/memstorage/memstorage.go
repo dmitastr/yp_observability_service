@@ -1,4 +1,4 @@
-package database
+package memstorage
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
-	backupmanager "github.com/dmitastr/yp_observability_service/internal/repository/backup_manager"
+	backupmanager "github.com/dmitastr/yp_observability_service/internal/repository"
 )
 
 type MetricEntity struct {
@@ -78,26 +78,26 @@ func (storage *Storage) fromList(metrics []models.Metrics) map[string]models.Met
 }
 
 func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) error {
-	logger.GetLogger().Infof("Get new data: %s", newMetric.String())
+	logger.Infof("Get new data: %s", newMetric.String())
 	storage.Lock()
 	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
 		if metric.Delta != nil {
-			newMetric.DeltaSet(metric.Delta)
+			newMetric.UpdateDelta(metric.Delta)
 		}
 	}
 	storage.Metrics[newMetric.ID] = newMetric
 	if storage.StreamWrite {
 		metrics := storage.toList()
 		if err := storage.BackupManager.Flush(metrics); err != nil {
-			logger.GetLogger().Error(err)
+			logger.Error(err)
 		}
 	}
 	return nil
 }
 
 func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics) error {
-	logger.GetLogger().Infof("Get %d new metrics", len(metrics))
+	logger.Infof("Get %d new metrics", len(metrics))
 	for _, metric := range metrics {
 		err := storage.Update(ctx, metric)
 		if err != nil {
@@ -110,7 +110,7 @@ func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics
 		if err := storage.BackupManager.Flush(metrics); err != nil {
 			return err
 		}
-		
+
 	}
 	return nil
 }
@@ -121,7 +121,7 @@ func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 
 func (storage *Storage) Get(ctx context.Context, key string) (*models.Metrics, error) {
 	if metric, ok := storage.Metrics[key]; ok {
-		logger.GetLogger().Infof("Found metric: %s", metric)
+		logger.Infof("Found metric: %s", metric)
 		return &metric, nil
 	}
 	return nil, errs.ErrorMetricDoesNotExist

@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/mocks"
-	models "github.com/dmitastr/yp_observability_service/internal/model"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +28,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 	}
 
 	type pathParam struct {
-		Name   string
+		Name  string
 		Mtype string
 	}
 
@@ -37,7 +37,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 		method        string
 		wantCode      int
 		pathParams    pathParam
-		wantErr bool
+		wantErr       bool
 		serviceErrOut bool
 	}{
 		{
@@ -45,44 +45,44 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 			method:   http.MethodGet,
 			wantCode: http.StatusOK,
 			pathParams: pathParam{
-				Name: "abc",
+				Name:  "abc",
 				Mtype: "gauge",
 			},
 			serviceErrOut: false,
-			wantErr: false,
+			wantErr:       false,
 		},
 		{
 			name:     "POST method",
 			method:   http.MethodPost,
 			wantCode: http.StatusOK,
 			pathParams: pathParam{
-				Name: "abc",
+				Name:  "abc",
 				Mtype: "gauge",
 			},
 			serviceErrOut: false,
-			wantErr: false,
+			wantErr:       false,
 		},
 		{
 			name:     "Bad path - missing param",
 			method:   http.MethodGet,
 			wantCode: http.StatusNotFound,
 			pathParams: pathParam{
-				Name: "",
+				Name:  "",
 				Mtype: "gauge",
 			},
 			serviceErrOut: false,
-			wantErr: true,
+			wantErr:       true,
 		},
 		{
 			name:     "Service returned an error",
 			method:   http.MethodGet,
 			wantCode: http.StatusBadRequest,
 			pathParams: pathParam{
-				Name: "abc",
+				Name:  "abc",
 				Mtype: "gauge",
 			},
 			serviceErrOut: true,
-			wantErr: false,
+			wantErr:       false,
 		},
 	}
 	for _, tt := range tests {
@@ -90,7 +90,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 			mockSrv := mocks.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 			mockSrv.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, errValue).AnyTimes()
-			
+
 			handler := NewHandler(mockSrv)
 
 			req := httptest.NewRequest(tt.method, "http://localhost", nil)
