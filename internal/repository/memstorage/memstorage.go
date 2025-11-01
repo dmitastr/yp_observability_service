@@ -120,7 +120,7 @@ func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return storage.toList(), nil
 }
 
-func (storage *Storage) GetById(ctx context.Context, names []string) ([]models.Metrics, error) {
+func (storage *Storage) GetByID(ctx context.Context, names []string) ([]models.Metrics, error) {
 	metrics := storage.toList()
 	for i, metric := range metrics {
 		if !slices.Contains(names, metric.ID) {

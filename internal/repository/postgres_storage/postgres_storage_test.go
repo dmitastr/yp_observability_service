@@ -83,10 +83,10 @@ func (suite *MetricsRepoTestSuite) TestGet() {
 	assert.NotNil(t, m)
 }
 
-func (suite *MetricsRepoTestSuite) TestGetById() {
+func (suite *MetricsRepoTestSuite) TestGetByID() {
 	t := suite.T()
 
-	m, err := suite.repository.GetById(suite.ctx, []string{"metric"})
+	m, err := suite.repository.GetByID(suite.ctx, []string{"metric"})
 	assert.NoError(t, err)
 	assert.NotNil(t, m)
 }

@@ -200,12 +200,12 @@ func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, erro
 	return metric, err
 }
 
-func (pg *Postgres) GetById(ctx context.Context, names []string) ([]models.Metrics, error) {
+func (pg *Postgres) GetByID(ctx context.Context, names []string) ([]models.Metrics, error) {
 	var metrics []models.Metrics
 	var err error
 
 	fun := func(tx pgx.Tx) error {
-		metrics, err = pg.getByIdWithinTx(ctx, names, tx)
+		metrics, err = pg.getByIDWithinTx(ctx, names, tx)
 		if err != nil {
 			return fmt.Errorf("unable to query metrics: %w", err)
 		}
@@ -229,7 +229,7 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return metrics, err
 }
 
-func (pg *Postgres) getByIdWithinTx(ctx context.Context, names []string, conn Cursor) ([]models.Metrics, error) {
+func (pg *Postgres) getByIDWithinTx(ctx context.Context, names []string, conn Cursor) ([]models.Metrics, error) {
 	if conn == nil {
 		conn = pg.db
 	}
