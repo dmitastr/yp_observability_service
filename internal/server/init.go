@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 
@@ -34,21 +35,24 @@ import (
 
 // NewServer creates a new server, register all handlers and middleware
 // and inject necessary dependencies
-func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
-	var storage dbinterface.Database
+func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface.Database, err error) {
+
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
 
 	} else {
-		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
 		if err != nil {
-			logger.Panicf("couldn't connect to postgres memstorage: ", err)
+			return router, storage, fmt.Errorf("error creating postgres storage: %w", err)
 		}
 	}
-	storage.Init()
+	if err = storage.Init(); err != nil {
+		return router, storage, fmt.Errorf("error initializing postgres storage: %w", err)
+	}
 
+	// Set path for profiling
+	router = chi.NewRouter()
 	pinger := postgrespinger.New()
 	auditor := audit.NewAuditor().
 		AddListener(listener.NewListener(listener.FileListenerType, cfg.AuditFile)).
@@ -56,6 +60,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 
 	observabilityService := service.NewService(storage, pinger, auditor)
 
+	// middleware
 	metricHandler := updatemetric.NewHandler(observabilityService)
 	metricBatchHandler := updatemetricsbatch.NewHandler(observabilityService)
 	getMetricHandler := getmetric.NewHandler(observabilityService)
@@ -63,17 +68,13 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	pingHandler := pingdatabase.New(observabilityService)
 	signedCheckHandler := hash.NewSignedChecker(cfg)
 
-	router := chi.NewRouter()
-
-	// middleware
+	// setting routes
 	router.Use(
 		requestlogger.RequestLogger,
 		signedCheckHandler.Check,
 	)
 
-	// Set path for profiling
 	router.Mount("/debug", middleware.Profiler())
-	// setting routes
 	router.Group(func(r chi.Router) {
 		r.Use(compress.CompressMiddleware)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
@@ -98,7 +99,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 
 	})
 
-	return router, storage
+	return
 }
 
 // Run initialized [cobra.Command] for args parsing and starts the server
@@ -106,7 +107,9 @@ func Run() error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability service",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logger.Initialize()
+			if err := logger.Initialize(); err != nil {
+				return err
+			}
 
 			var cfg serverenvconfig.Config
 			// Unmarshal the configuration into the Config struct
@@ -114,8 +117,11 @@ func Run() error {
 				logger.Errorf("Unable to decode into struct, %v\n", err)
 				return err
 			}
-			router, postgresDB := NewServer(cfg)
+			router, postgresDB, err := NewServer(cfg)
 			defer postgresDB.Close()
+			if err != nil {
+				return err
+			}
 
 			logger.Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
 			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
