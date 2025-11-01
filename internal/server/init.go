@@ -47,7 +47,7 @@ func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface
 			return router, storage, fmt.Errorf("error creating postgres storage: %w", err)
 		}
 	}
-	if err = storage.Init(); err != nil {
+	if err = storage.Init("file://migrations"); err != nil {
 		return router, storage, fmt.Errorf("error initializing postgres storage: %w", err)
 	}
 

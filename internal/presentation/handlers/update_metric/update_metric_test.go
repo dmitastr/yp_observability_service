@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	"github.com/dmitastr/yp_observability_service/internal/mocks/service"
 	_ "github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +89,7 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 
-			mockSrv := mocks.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 
 			mockSrv.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()

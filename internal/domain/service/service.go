@@ -27,12 +27,29 @@ func NewService(db dbinterface.Database, pinger pinger.Pinger, auditor audit.IAu
 
 func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
 	logger.Infof("Processing update: %s", upd)
-	metric := models.FromUpdate(upd)
-	err := service.db.Update(ctx, metric)
-	return err
+	metricNew := models.FromUpdate(upd)
+	metricExist, err := service.db.Get(ctx, metricNew.ID)
+	if err != nil {
+		return err
+	}
+	if metricExist != nil && metricExist.Delta != nil {
+		metricNew.UpdateDelta(*metricExist.Delta)
+	}
+
+	return service.db.Update(ctx, metricNew)
 }
 
 func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics) error {
+	for i, m := range metrics {
+		mExist, err := service.db.Get(ctx, m.ID)
+		if err != nil {
+			return err
+		}
+		if mExist != nil && mExist.Delta != nil {
+			metrics[i].UpdateDelta(*mExist.Delta)
+		}
+	}
+
 	if err := service.db.BulkUpdate(ctx, metrics); err != nil {
 		return err
 	}

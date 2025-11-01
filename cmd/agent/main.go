@@ -22,7 +22,17 @@ func init() {
 	flag.IntVar(&rateLimit, "l", 3, "rate limit")
 }
 
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
+
 func main() {
+	logger.Infof("Build version: %s\n", buildVersion)
+	logger.Infof("Build data: %s\n", buildDate)
+	logger.Infof("Build commit: %s\n", buildCommit)
+
 	flag.Parse()
 	cfg := agentenvconfig.New(serverAddress, pollInterval, reportInterval, key, rateLimit)
 

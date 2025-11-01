@@ -3,6 +3,7 @@ package memstorage
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
@@ -53,7 +54,7 @@ func NewStorage(cfg serverenvconfig.Config, bm backupmanager.BackupManager) *Sto
 	return &storage
 }
 
-func (storage *Storage) Init() error {
+func (storage *Storage) Init(_ string) error {
 	if !storage.StreamWrite {
 		storage.BackupManager.RunBackup(storage.toList)
 	}
@@ -83,7 +84,7 @@ func (storage *Storage) Update(ctx context.Context, newMetric models.Metrics) er
 	defer storage.Unlock()
 	if metric, ok := storage.Metrics[newMetric.ID]; ok {
 		if metric.Delta != nil {
-			newMetric.UpdateDelta(metric.Delta)
+			newMetric.UpdateDelta(*metric.Delta)
 		}
 	}
 	storage.Metrics[newMetric.ID] = newMetric
@@ -117,6 +118,16 @@ func (storage *Storage) BulkUpdate(ctx context.Context, metrics []models.Metrics
 
 func (storage *Storage) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	return storage.toList(), nil
+}
+
+func (storage *Storage) GetById(ctx context.Context, names []string) ([]models.Metrics, error) {
+	metrics := storage.toList()
+	for i, metric := range metrics {
+		if !slices.Contains(names, metric.ID) {
+			metrics = append(metrics[:i], metrics[i+1:]...)
+		}
+	}
+	return metrics, nil
 }
 
 func (storage *Storage) Get(ctx context.Context, key string) (*models.Metrics, error) {

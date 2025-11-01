@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	"github.com/dmitastr/yp_observability_service/internal/mocks/service"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -76,7 +76,7 @@ func TestBatchUpdateHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBuffer(tt.payload))
 
-			mockSrv := mocks.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 
 			mockSrv.EXPECT().BatchUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
