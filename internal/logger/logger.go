@@ -40,7 +40,7 @@ func Initialize() error {
 		cfg := zap.NewDevelopmentConfig()
 		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 
-		logger, errLogger := cfg.Build()
+		logger, errLogger := cfg.Build(zap.AddCallerSkip(1))
 		if errLogger != nil {
 			err = fmt.Errorf("could not initialize zap logger: %w", errLogger)
 		}
