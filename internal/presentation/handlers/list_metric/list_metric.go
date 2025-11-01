@@ -43,7 +43,8 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 
 	wd, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		logger.Error(err)
+		http.Error(res, "error while getting working directory", http.StatusInternalServerError)
 	}
 	parentPath := "./"
 	if strings.Contains(wd, "handlers") {

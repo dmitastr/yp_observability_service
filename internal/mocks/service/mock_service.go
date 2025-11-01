@@ -2,7 +2,7 @@
 // Source: github.com/dmitastr/yp_observability_service/internal/domain/service_interface (interfaces: ServiceAbstract)
 
 // Package mocks is a generated GoMock package.
-package mocks
+package service
 
 import (
 	"context"

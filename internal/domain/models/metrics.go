@@ -30,12 +30,12 @@ func FromUpdate(upd update.MetricUpdate) (m Metrics) {
 }
 
 // UpdateDelta increment Delta value or set it if it's nil
-func (m *Metrics) UpdateDelta(value *int64) {
+func (m *Metrics) UpdateDelta(value int64) {
 	if m.Delta == nil {
-		m.Delta = value
+		m.Delta = &value
 		return
 	}
-	*m.Delta += *value
+	*m.Delta += value
 }
 
 // SetValue updates value field of a metric

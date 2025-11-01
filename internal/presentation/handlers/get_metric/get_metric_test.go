@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/models"
-	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	"github.com/dmitastr/yp_observability_service/internal/mocks/service"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,7 +87,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSrv := mocks.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockServiceAbstract(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 			mockSrv.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, errValue).AnyTimes()
 
