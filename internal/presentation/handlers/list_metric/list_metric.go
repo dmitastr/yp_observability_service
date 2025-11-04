@@ -36,15 +36,17 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 
 	metrics, err := handler.service.GetAll(ctx)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		logger.Errorf("error while getting metrics: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	logger.Infof("Receive %d metrics from db", len(metrics))
 
 	wd, err := os.Getwd()
 	if err != nil {
-		logger.Error(err)
-		http.Error(res, "error while getting working directory", http.StatusInternalServerError)
+		logger.Errorf("error while getting working directory: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 	parentPath := "./"
 	if strings.Contains(wd, "handlers") {
@@ -53,16 +55,16 @@ func (handler ListMetricsHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	templatePath := filepath.Join(parentPath, "web", "templates", "index.html")
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
-		logger.Error(err)
-		http.Error(res, "Template parsing error", http.StatusInternalServerError)
+		logger.Errorf("Template parsing error: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	res.Header().Set("Content-Type", "text/html")
-	res.WriteHeader(http.StatusOK)
 	err = t.Execute(res, metrics)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		logger.Errorf("Template execution error: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 }
