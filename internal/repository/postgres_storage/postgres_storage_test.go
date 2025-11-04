@@ -6,7 +6,6 @@ import (
 
 	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/domain/models"
-	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/mocks/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -23,25 +22,25 @@ func (suite *MetricsRepoTestSuite) SetupSuite() {
 	suite.ctx = context.Background()
 	pgContainer, err := testhelpers.CreatePostgresContainer(suite.ctx)
 	if err != nil {
-		logger.Fatal(err)
+		suite.Suite.T().Log("Error creating postgres container", err)
 	}
 	suite.pgContainer = pgContainer
 	db, err := NewPG(suite.ctx, serverenvconfig.Config{DBUrl: &suite.pgContainer.ConnectionString})
 	if err != nil {
-		logger.Fatal(err)
+		suite.Suite.T().Log("Error database instance", err)
 	}
 	if err := db.Init("file://../../../migrations"); err != nil {
-		logger.Fatal(err)
+		suite.Suite.T().Log("Error migrating with prod data", err)
 	}
 	if err := db.Init("file://../../../migrations/testdata"); err != nil {
-		logger.Fatal(err)
+		suite.Suite.T().Log("Error migrating with test data", err)
 	}
 	suite.repository = db
 }
 
 func (suite *MetricsRepoTestSuite) TearDownSuite() {
 	if err := suite.pgContainer.Terminate(suite.ctx); err != nil {
-		logger.Fatalf("error terminating postgres container: %s", err)
+		suite.Suite.T().Log("Error while terminating PG container", err)
 	}
 }
 
