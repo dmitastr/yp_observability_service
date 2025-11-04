@@ -22,25 +22,25 @@ func (suite *MetricsRepoTestSuite) SetupSuite() {
 	suite.ctx = context.Background()
 	pgContainer, err := testhelpers.CreatePostgresContainer(suite.ctx)
 	if err != nil {
-		suite.Suite.T().Log("Error creating postgres container", err)
+		suite.T().Log("Error creating postgres container", err)
 	}
 	suite.pgContainer = pgContainer
 	db, err := NewPG(suite.ctx, serverenvconfig.Config{DBUrl: &suite.pgContainer.ConnectionString})
 	if err != nil {
-		suite.Suite.T().Log("Error database instance", err)
+		suite.T().Log("Error database instance", err)
 	}
 	if err := db.Init("file://../../../migrations"); err != nil {
-		suite.Suite.T().Log("Error migrating with prod data", err)
+		suite.T().Log("Error migrating with prod data", err)
 	}
 	if err := db.Init("file://../../../migrations/testdata"); err != nil {
-		suite.Suite.T().Log("Error migrating with test data", err)
+		suite.T().Log("Error migrating with test data", err)
 	}
 	suite.repository = db
 }
 
 func (suite *MetricsRepoTestSuite) TearDownSuite() {
 	if err := suite.pgContainer.Terminate(suite.ctx); err != nil {
-		suite.Suite.T().Log("Error while terminating PG container", err)
+		suite.T().Log("Error while terminating PG container", err)
 	}
 }
 
