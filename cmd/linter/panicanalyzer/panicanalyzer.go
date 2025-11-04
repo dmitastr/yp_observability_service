@@ -2,6 +2,7 @@ package panicanalyzer
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -37,6 +38,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				}
 				pkgName := pkg.Name
 				funcName := expr.Sel.Name
+
+				pkgObj := pass.TypesInfo.Uses[pkg]
+				if pkgImport, ok := pkgObj.(*types.PkgName); ok {
+					pkgName = pkgImport.Imported().Name()
+				}
+
 				if pkgName == "os" && funcName == "Exit" {
 					pass.Reportf(n.Pos(), "os.Exit call outside of main")
 				} else if pkgName == "log" && funcName == "Fatal" {
