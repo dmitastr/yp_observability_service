@@ -3,13 +3,13 @@ package updatemetricsbatch
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	srv "github.com/dmitastr/yp_observability_service/internal/domain/service"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
 // BatchUpdateHandler handles requests for updating metric value or creating a new one for several metrics
@@ -31,7 +31,8 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 
 	var metrics []models.Metrics
 	if err := json.NewDecoder(req.Body).Decode(&metrics); err != nil {
-		http.Error(res, fmt.Errorf("error while decoding request body: %v", err).Error(), http.StatusBadRequest)
+		logger.Errorf("error while decoding request body: %v", err)
+		http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -41,7 +42,8 @@ func (handler BatchUpdateHandler) ServeHTTP(res http.ResponseWriter, req *http.R
 	ctx = context.WithValue(ctx, common.SenderInfo{}, common.ExtractIP(req))
 
 	if err := handler.service.BatchUpdate(ctx, metrics); err != nil {
-		http.Error(res, fmt.Errorf("error while batch metrics update: %v", err).Error(), http.StatusInternalServerError)
+		logger.Errorf("error while batch metrics update: %v", err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

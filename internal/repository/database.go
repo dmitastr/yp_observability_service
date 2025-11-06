@@ -11,7 +11,8 @@ type Database interface {
 	BulkUpdate(context.Context, []models.Metrics) error
 	GetAll(context.Context) ([]models.Metrics, error)
 	Get(context.Context, string) (*models.Metrics, error)
+	GetByID(context.Context, []string) ([]models.Metrics, error)
 	Close() error
-	Init() error
+	Init(string) error
 	Ping(context.Context) error
 }

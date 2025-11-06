@@ -11,6 +11,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/repository/postgres_storage/pg_err_classifier"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,7 +54,7 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
 	VALUES (@name, @mtype, @value, @delta) 
 	ON CONFLICT ON CONSTRAINT metrics_pkey DO UPDATE SET 
 	value = @value, 
-    delta = metrics.delta + @delta `
+    delta = @delta `
 
 func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 
@@ -87,7 +88,7 @@ func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
 	return pg, nil
 }
 
-func (pg *Postgres) Init() error {
+func (pg *Postgres) Init(migrationDir string) error {
 	db, err := sql.Open("postgres", pg.db.Config().ConnString())
 	if err != nil {
 		logger.Fatalf("Unable to connect to memstorage: %v", err)
@@ -98,7 +99,7 @@ func (pg *Postgres) Init() error {
 		logger.Fatal(err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
+	m, err := migrate.NewWithDatabaseInstance(migrationDir, "postgres", driver)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -199,6 +200,21 @@ func (pg *Postgres) Get(ctx context.Context, name string) (*models.Metrics, erro
 	return metric, err
 }
 
+func (pg *Postgres) GetByID(ctx context.Context, names []string) ([]models.Metrics, error) {
+	var metrics []models.Metrics
+	var err error
+
+	fun := func(tx pgx.Tx) error {
+		metrics, err = pg.getByIDWithinTx(ctx, names, tx)
+		if err != nil {
+			return fmt.Errorf("unable to query metrics: %w", err)
+		}
+		return nil
+	}
+	err = pg.ExecuteTX(ctx, pg.db, fun)
+	return metrics, err
+}
+
 func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	var metrics []models.Metrics
 	fun := func(tx pgx.Tx) error {
@@ -211,6 +227,26 @@ func (pg *Postgres) GetAll(ctx context.Context) ([]models.Metrics, error) {
 	}
 	err := pg.ExecuteTX(ctx, pg.db, fun)
 	return metrics, err
+}
+
+func (pg *Postgres) getByIDWithinTx(ctx context.Context, names []string, conn Cursor) ([]models.Metrics, error) {
+	if conn == nil {
+		conn = pg.db
+	}
+
+	namesArg := &pgtype.Array[string]{}
+	namesArg.Elements = names
+
+	query := `SELECT name, mtype, value, delta FROM metrics WHERE name = ANY ($1)`
+
+	rows, err := conn.Query(ctx, query, namesArg)
+	if err != nil {
+		logger.Errorf("unable to query metrics: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Metrics])
 }
 
 func (pg *Postgres) getWithinTx(ctx context.Context, name string, conn Cursor) (*models.Metrics, error) {
@@ -237,7 +273,7 @@ func (pg *Postgres) getAllWithinTx(ctx context.Context, conn Cursor) ([]models.M
 
 	rows, err := conn.Query(ctx, query)
 	if err != nil {
-		logger.Errorf("unable to query users: %v", err)
+		logger.Errorf("unable to query metrics: %v", err)
 		return nil, err
 	}
 	defer rows.Close()

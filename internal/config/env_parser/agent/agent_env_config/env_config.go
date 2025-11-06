@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	Address        *string `env:"ADDRESS"`
-	PollInterval   *int    `env:"POLL_INTERVAL"`
-	ReportInterval *int    `env:"REPORT_INTERVAL"`
-	Key            *string `env:"KEY"`
-	RateLimit      *int    `env:"RATE_LIMIT"`
+	Address        *string `env:"ADDRESS" mapstructure:"a"`
+	PollInterval   *int    `env:"POLL_INTERVAL" mapstructure:"p"`
+	ReportInterval *int    `env:"REPORT_INTERVAL" mapstructure:"r"`
+	Key            *string `env:"KEY" mapstructure:"k"`
+	RateLimit      *int    `env:"RATE_LIMIT" mapstructure:"l"`
+	PublicKeyFile  *string `env:"CRYPTO_KEY" mapstructure:"crypto-key"`
 }
 
 func New(address string, pollInterval int, reportInterval int, key string, rateLimit int) (cfg Config) {

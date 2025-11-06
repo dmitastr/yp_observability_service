@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
@@ -13,6 +14,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
+	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
@@ -27,13 +29,40 @@ func NewService(db dbinterface.Database, pinger pinger.Pinger, auditor audit.IAu
 
 func (service Service) ProcessUpdate(ctx context.Context, upd update.MetricUpdate) error {
 	logger.Infof("Processing update: %s", upd)
-	metric := models.FromUpdate(upd)
-	err := service.db.Update(ctx, metric)
-	return err
+	metricNew := models.FromUpdate(upd)
+	metricExist, err := service.db.Get(ctx, metricNew.ID)
+	if err != nil {
+		return err
+	}
+	if metricExist != nil && metricExist.Delta != nil {
+		metricNew.UpdateDelta(*metricExist.Delta)
+	}
+
+	return service.db.Update(ctx, metricNew)
 }
 
 func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics) error {
-	if err := service.db.BulkUpdate(ctx, metrics); err != nil {
+	for i, m := range metrics {
+		if m.MType != common.COUNTER {
+			continue
+		}
+
+		mExist, err := service.db.Get(ctx, m.ID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn("No rows returned")
+		} else if err != nil {
+			continue
+		}
+
+		if mExist != nil && mExist.Delta != nil {
+			metrics[i].UpdateDelta(*mExist.Delta)
+		}
+	}
+
+	if err := service.db.BulkUpdate(ctx, metrics); errors.Is(err, pgx.ErrNoRows) {
+		logger.Warn("No rows returned")
+	} else if err != nil {
+		logger.Errorf("Bulk Update Error: %v", err)
 		return err
 	}
 
@@ -47,7 +76,7 @@ func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics
 
 func (service Service) GetMetric(ctx context.Context, upd update.MetricUpdate) (metric *models.Metrics, err error) {
 	metric, err = service.db.Get(ctx, upd.MetricName)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 
@@ -59,7 +88,7 @@ func (service Service) GetMetric(ctx context.Context, upd update.MetricUpdate) (
 
 func (service Service) GetAll(ctx context.Context) (metricLst []models.DisplayMetric, err error) {
 	metricDB, err := service.db.GetAll(ctx)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 
