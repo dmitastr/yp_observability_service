@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/certdecode"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
 	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
 	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
@@ -34,21 +36,23 @@ import (
 
 // NewServer creates a new server, register all handlers and middleware
 // and inject necessary dependencies
-func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
-	var storage dbinterface.Database
+func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface.Database, err error) {
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
 
 	} else {
-		var err error
 		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
 		if err != nil {
-			logger.Panicf("couldn't connect to postgres memstorage: ", err)
+			return router, storage, fmt.Errorf("error creating postgres storage: %w", err)
 		}
 	}
-	storage.Init()
+	if err = storage.Init("file://migrations"); err != nil {
+		return router, storage, fmt.Errorf("error initializing postgres storage: %w", err)
+	}
 
+	// Set path for profiling
+	router = chi.NewRouter()
 	pinger := postgrespinger.New()
 	auditor := audit.NewAuditor().
 		AddListener(listener.NewListener(listener.FileListenerType, cfg.AuditFile)).
@@ -62,20 +66,19 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	listMetricsHandler := listmetric.NewHandler(observabilityService)
 	pingHandler := pingdatabase.New(observabilityService)
 	signedCheckHandler := hash.NewSignedChecker(cfg)
-
-	router := chi.NewRouter()
+	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
 
 	// middleware
 	router.Use(
-		requestlogger.RequestLogger,
-		signedCheckHandler.Check,
+		requestlogger.Handle,
+		rsaDecodeHandler.Handle,
+		signedCheckHandler.Handle,
 	)
 
-	// Set path for profiling
-	router.Mount("/debug", middleware.Profiler())
 	// setting routes
+	router.Mount("/debug", middleware.Profiler())
 	router.Group(func(r chi.Router) {
-		r.Use(compress.CompressMiddleware)
+		r.Use(compress.HandleCompression)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
 
 		r.Route(`/update`, func(r chi.Router) {
@@ -89,7 +92,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 	})
 
 	router.Group(func(r chi.Router) {
-		r.Use(compress.DecompressMiddleware)
+		r.Use(compress.HandleDecompression)
 
 		r.Route(`/value`, func(r chi.Router) {
 			r.Post(`/`, getMetricHandler.ServeHTTP)
@@ -98,7 +101,7 @@ func NewServer(cfg serverenvconfig.Config) (*chi.Mux, dbinterface.Database) {
 
 	})
 
-	return router, storage
+	return
 }
 
 // Run initialized [cobra.Command] for args parsing and starts the server
@@ -106,7 +109,15 @@ func Run() error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability service",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logger.Initialize()
+			if err := logger.Initialize(); err != nil {
+				return err
+			}
+			if cfgPath := viper.GetString("config"); cfgPath != "" {
+				viper.SetConfigFile(cfgPath)
+				if err := viper.ReadInConfig(); err != nil {
+					logger.Errorf("Error reading config file, %s\n", err)
+				}
+			}
 
 			var cfg serverenvconfig.Config
 			// Unmarshal the configuration into the Config struct
@@ -114,10 +125,13 @@ func Run() error {
 				logger.Errorf("Unable to decode into struct, %v\n", err)
 				return err
 			}
-			router, postgresDB := NewServer(cfg)
+			router, postgresDB, err := NewServer(cfg)
 			defer postgresDB.Close()
+			if err != nil {
+				return err
+			}
 
-			logger.Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
+			logger.Infof("Starting server with config: %#v\n", cfg)
 			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 				return err
 			}
@@ -126,14 +140,16 @@ func Run() error {
 		},
 	}
 
-	rootCmd.Flags().String("a", "localhost:8080", "set server host and port")
-	rootCmd.Flags().Int("i", 300, "interval for storing data to the file in seconds, 0=stream writing")
-	rootCmd.Flags().Bool("r", false, "restore data from file")
-	rootCmd.Flags().String("f", "./data/data.json", "path for writing data")
-	rootCmd.Flags().String("d", "", "memstorage connection url")
-	rootCmd.Flags().String("k", "", "key for request signing")
+	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
+	rootCmd.Flags().IntP("store_interval", "i", 300, "interval for storing data to the file in seconds, 0=stream writing")
+	rootCmd.Flags().BoolP("restore", "r", false, "restore data from file")
+	rootCmd.Flags().StringP("store_file", "f", "./data/data.json", "path for writing data")
+	rootCmd.Flags().StringP("database_dsn", "d", "", "postgres connection url")
+	rootCmd.Flags().StringP("key", "k", "", "key for request signing")
 	rootCmd.Flags().String("audit-file", "", "file path for audit logs")
 	rootCmd.Flags().String("audit-url", "", "url for audit logs")
+	rootCmd.Flags().String("crypto-key", "", "path to file with private key")
+	rootCmd.Flags().StringP("config", "c", "", "path to config file")
 
 	_ = viper.BindPFlags(rootCmd.Flags())
 
@@ -148,6 +164,8 @@ func Run() error {
 	_ = viper.BindEnv("k", "KEY")
 	_ = viper.BindEnv("audit-file", "AUDIT_FILE")
 	_ = viper.BindEnv("audit-url", "AUDIT_URL")
+	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
+	_ = viper.BindEnv("config", "CONFIG")
 
 	return rootCmd.Execute()
 

@@ -15,14 +15,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dmitastr/yp_observability_service/internal/agent/rsaencoder"
 	"github.com/dmitastr/yp_observability_service/internal/domain/signature"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/common"
-	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
+	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
@@ -64,6 +67,67 @@ const (
 	CPUutilization1 = "CPUUtilization1"
 )
 
+// Run initialized [cobra.Command] for args parsing and starts the server
+func Run() error {
+	rootCmd := &cobra.Command{
+		Use: "YP observability agent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := logger.Initialize(); err != nil {
+				return err
+			}
+
+			if cfgPath := viper.GetString("config"); cfgPath != "" {
+				viper.SetConfigFile(cfgPath)
+				if err := viper.ReadInConfig(); err != nil {
+					logger.Errorf("Error reading config file, %s\n", err)
+				}
+			}
+
+			var cfg config.Config
+			// Unmarshal the configuration into the Config struct
+			if err := viper.Unmarshal(&cfg); err != nil {
+				logger.Errorf("Unable to decode into struct, %v\n", err)
+				return err
+			}
+			agent := NewAgent(cfg)
+
+			logger.Infof("Starting client for server=%s, poll interval=%d, report interval=%d",
+				*cfg.Address,
+				*cfg.PollInterval,
+				*cfg.ReportInterval,
+			)
+
+			agent.Run(*cfg.PollInterval, *cfg.ReportInterval)
+
+			return nil
+		},
+	}
+
+	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
+	rootCmd.Flags().IntP("report_interval", "r", 10, "frequency of data sending to server in seconds")
+	rootCmd.Flags().IntP("poll_interval", "p", 10, "frequency of metric polling from source in seconds")
+	rootCmd.Flags().IntP("rate_limit", "l", 3, "rate limit")
+	rootCmd.Flags().String("k", "", "key for request signing")
+	rootCmd.Flags().String("crypto-key", "", "path to file with public key")
+	rootCmd.Flags().StringP("config", "c", "", "path to config file")
+
+	_ = viper.BindPFlags(rootCmd.Flags())
+
+	viper.AutomaticEnv()
+
+	// Bind environment variables
+	_ = viper.BindEnv("address", "ADDRESS")
+	_ = viper.BindEnv("k", "KEY")
+	_ = viper.BindEnv("report_interval", "REPORT_INTERVAL")
+	_ = viper.BindEnv("poll_interval", "POLL_INTERVAL")
+	_ = viper.BindEnv("rate_limit", "RATE_LIMIT")
+	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
+	_ = viper.BindEnv("config", "CONFIG")
+
+	return rootCmd.Execute()
+
+}
+
 type Result struct {
 	err error
 }
@@ -75,9 +139,10 @@ type Agent struct {
 	address    string
 	HashSigner *signature.HashSigner
 	RateLimit  int
+	encoder    *rsaencoder.Encoder
 }
 
-func NewAgent(cfg agentenvconfig.Config) *Agent {
+func NewAgent(cfg config.Config) *Agent {
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Timeout = time.Millisecond * 300
 	client.RetryMax = 3
@@ -96,6 +161,10 @@ func NewAgent(cfg agentenvconfig.Config) *Agent {
 		address:    address,
 		HashSigner: signature.NewHashSigner(cfg.Key),
 		RateLimit:  *cfg.RateLimit,
+	}
+
+	if cfg.PublicKeyFile != nil && *cfg.PublicKeyFile != "" {
+		agent.encoder = rsaencoder.NewEncoder(*cfg.PublicKeyFile)
 	}
 	return &agent
 }
@@ -186,19 +255,23 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 	var compression string
 
 	if compressed {
-		gw := gzip.NewWriter(&postData)
-		if _, err := gw.Write(data); err != nil {
-			return nil, err
-		}
-		if err := gw.Close(); err != nil {
+		data, err = agent.compress(data)
+		if err != nil {
 			logger.Errorf("failed to close gzip writer: %v", err)
 		}
 		compression = "gzip"
+	}
+
+	encoded, err := agent.Encode(data)
+	if err != nil {
+		logger.Errorf("failed to encode post data: %v", err)
 	} else {
-		if _, err := postData.Write(data); err != nil {
-			logger.Errorf("failed to write uncompressed: %v", err)
-			return nil, err
-		}
+		data = encoded
+	}
+
+	if _, err = postData.Write(data); err != nil {
+		logger.Errorf("failed to post data: %v", err)
+		return
 	}
 
 	req, err := retryablehttp.NewRequest(http.MethodPost, url, &postData)
@@ -340,4 +413,24 @@ func (agent *Agent) SendData(reportInterval int) {
 func (agent *Agent) Run(pollInterval int, reportInterval int) {
 	go agent.Update(pollInterval)
 	agent.SendData(reportInterval)
+}
+
+func (agent *Agent) Encode(data []byte) ([]byte, error) {
+	if agent.encoder != nil {
+		return agent.encoder.Encode(data)
+	}
+	return data, nil
+}
+
+func (agent *Agent) compress(data []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+
+	gw := gzip.NewWriter(&compressed)
+	if _, err := gw.Write(data); err != nil {
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		logger.Errorf("failed to close gzip writer: %v", err)
+	}
+	return compressed.Bytes(), nil
 }
