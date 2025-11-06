@@ -8,6 +8,7 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/certdecode"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
 	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
 	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
@@ -36,7 +37,6 @@ import (
 // NewServer creates a new server, register all handlers and middleware
 // and inject necessary dependencies
 func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface.Database, err error) {
-
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
@@ -60,23 +60,25 @@ func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface
 
 	observabilityService := service.NewService(storage, pinger, auditor)
 
-	// middleware
 	metricHandler := updatemetric.NewHandler(observabilityService)
 	metricBatchHandler := updatemetricsbatch.NewHandler(observabilityService)
 	getMetricHandler := getmetric.NewHandler(observabilityService)
 	listMetricsHandler := listmetric.NewHandler(observabilityService)
 	pingHandler := pingdatabase.New(observabilityService)
 	signedCheckHandler := hash.NewSignedChecker(cfg)
+	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
 
-	// setting routes
+	// middleware
 	router.Use(
-		requestlogger.RequestLogger,
-		signedCheckHandler.Check,
+		requestlogger.Handle,
+		rsaDecodeHandler.Handle,
+		signedCheckHandler.Handle,
 	)
 
+	// setting routes
 	router.Mount("/debug", middleware.Profiler())
 	router.Group(func(r chi.Router) {
-		r.Use(compress.CompressMiddleware)
+		r.Use(compress.HandleCompression)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
 
 		r.Route(`/update`, func(r chi.Router) {
@@ -90,7 +92,7 @@ func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface
 	})
 
 	router.Group(func(r chi.Router) {
-		r.Use(compress.DecompressMiddleware)
+		r.Use(compress.HandleDecompression)
 
 		r.Route(`/value`, func(r chi.Router) {
 			r.Post(`/`, getMetricHandler.ServeHTTP)
@@ -140,6 +142,7 @@ func Run() error {
 	rootCmd.Flags().String("k", "", "key for request signing")
 	rootCmd.Flags().String("audit-file", "", "file path for audit logs")
 	rootCmd.Flags().String("audit-url", "", "url for audit logs")
+	rootCmd.Flags().String("crypto-key", "", "path to file with private key	")
 
 	_ = viper.BindPFlags(rootCmd.Flags())
 
@@ -154,6 +157,7 @@ func Run() error {
 	_ = viper.BindEnv("k", "KEY")
 	_ = viper.BindEnv("audit-file", "AUDIT_FILE")
 	_ = viper.BindEnv("audit-url", "AUDIT_URL")
+	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
 
 	return rootCmd.Execute()
 

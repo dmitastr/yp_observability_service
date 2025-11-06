@@ -76,7 +76,7 @@ func TestBatchUpdateHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.url, bytes.NewBuffer(tt.payload))
 
-			mockSrv := service.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockIService(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 
 			mockSrv.EXPECT().BatchUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()

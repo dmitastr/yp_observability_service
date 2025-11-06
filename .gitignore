@@ -34,3 +34,7 @@ data/*
 
 # Files for sending request
 .rest
+
+# RSA keys
+certificates
+

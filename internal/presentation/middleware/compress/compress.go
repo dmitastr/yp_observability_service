@@ -77,8 +77,8 @@ func (c *CompressReader) SetReader(req *http.Request) {
 	}
 }
 
-// CompressMiddleware is a middleware that handles compression and decompression if appropriate headers are set
-func CompressMiddleware(next http.Handler) http.Handler {
+// HandleCompression is a middleware that handles compression and decompression if appropriate headers are set
+func HandleCompression(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		useWriter := res
 		contentEncoding := req.Header.Get("Content-Encoding")
@@ -103,8 +103,8 @@ func CompressMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// DecompressMiddleware checks if request was compressed and set reader for decompression
-func DecompressMiddleware(next http.Handler) http.Handler {
+// HandleDecompression checks if request was compressed and set reader for decompression
+func HandleDecompression(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		contentEncoding := req.Header.Get("Content-Encoding")
 		if strings.Contains(contentEncoding, "gzip") {
