@@ -112,6 +112,12 @@ func Run() error {
 			if err := logger.Initialize(); err != nil {
 				return err
 			}
+			if cfgPath := viper.GetString("config"); cfgPath != "" {
+				viper.SetConfigFile(cfgPath)
+				if err := viper.ReadInConfig(); err != nil {
+					logger.Errorf("Error reading config file, %s\n", err)
+				}
+			}
 
 			var cfg serverenvconfig.Config
 			// Unmarshal the configuration into the Config struct
@@ -125,7 +131,7 @@ func Run() error {
 				return err
 			}
 
-			logger.Infof("Starting server=%s, store interval=%d, file storage path=%s, restore data=%t\n", *cfg.Address, *cfg.StoreInterval, *cfg.FileStoragePath, *cfg.Restore)
+			logger.Infof("Starting server with config: %#v\n", cfg)
 			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
 				return err
 			}
@@ -134,15 +140,16 @@ func Run() error {
 		},
 	}
 
-	rootCmd.Flags().String("a", "localhost:8080", "set server host and port")
-	rootCmd.Flags().Int("i", 300, "interval for storing data to the file in seconds, 0=stream writing")
-	rootCmd.Flags().Bool("r", false, "restore data from file")
-	rootCmd.Flags().String("f", "./data/data.json", "path for writing data")
-	rootCmd.Flags().String("d", "", "memstorage connection url")
-	rootCmd.Flags().String("k", "", "key for request signing")
+	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
+	rootCmd.Flags().IntP("store_interval", "i", 300, "interval for storing data to the file in seconds, 0=stream writing")
+	rootCmd.Flags().BoolP("restore", "r", false, "restore data from file")
+	rootCmd.Flags().StringP("store_file", "f", "./data/data.json", "path for writing data")
+	rootCmd.Flags().StringP("database_dsn", "d", "", "postgres connection url")
+	rootCmd.Flags().StringP("key", "k", "", "key for request signing")
 	rootCmd.Flags().String("audit-file", "", "file path for audit logs")
 	rootCmd.Flags().String("audit-url", "", "url for audit logs")
-	rootCmd.Flags().String("crypto-key", "", "path to file with private key	")
+	rootCmd.Flags().String("crypto-key", "", "path to file with private key")
+	rootCmd.Flags().StringP("config", "c", "", "path to config file")
 
 	_ = viper.BindPFlags(rootCmd.Flags())
 
@@ -158,6 +165,7 @@ func Run() error {
 	_ = viper.BindEnv("audit-file", "AUDIT_FILE")
 	_ = viper.BindEnv("audit-url", "AUDIT_URL")
 	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
+	_ = viper.BindEnv("config", "CONFIG")
 
 	return rootCmd.Execute()
 
