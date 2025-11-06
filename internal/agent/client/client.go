@@ -76,6 +76,13 @@ func Run() error {
 				return err
 			}
 
+			if cfgPath := viper.GetString("config"); cfgPath != "" {
+				viper.SetConfigFile(cfgPath)
+				if err := viper.ReadInConfig(); err != nil {
+					logger.Errorf("Error reading config file, %s\n", err)
+				}
+			}
+
 			var cfg config.Config
 			// Unmarshal the configuration into the Config struct
 			if err := viper.Unmarshal(&cfg); err != nil {
@@ -96,24 +103,26 @@ func Run() error {
 		},
 	}
 
-	rootCmd.Flags().String("a", "localhost:8080", "set server host and port")
-	rootCmd.Flags().Int("r", 10, "frequency of data sending to server in seconds")
-	rootCmd.Flags().Int("p", 10, "frequency of metric polling from source in seconds")
-	rootCmd.Flags().Int("l", 3, "rate limit")
+	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
+	rootCmd.Flags().IntP("report_interval", "r", 10, "frequency of data sending to server in seconds")
+	rootCmd.Flags().IntP("poll_interval", "p", 10, "frequency of metric polling from source in seconds")
+	rootCmd.Flags().IntP("rate_limit", "l", 3, "rate limit")
 	rootCmd.Flags().String("k", "", "key for request signing")
-	rootCmd.Flags().String("crypto-key", "./certificates/cert.pem", "path to file with public key")
+	rootCmd.Flags().String("crypto-key", "", "path to file with public key")
+	rootCmd.Flags().StringP("config", "c", "", "path to config file")
 
 	_ = viper.BindPFlags(rootCmd.Flags())
 
 	viper.AutomaticEnv()
 
 	// Bind environment variables
-	_ = viper.BindEnv("a", "ADDRESS")
+	_ = viper.BindEnv("address", "ADDRESS")
 	_ = viper.BindEnv("k", "KEY")
-	_ = viper.BindEnv("r", "REPORT_INTERVAL")
-	_ = viper.BindEnv("p", "POLL_INTERVAL")
-	_ = viper.BindEnv("l", "RATE_LIMIT")
+	_ = viper.BindEnv("report_interval", "REPORT_INTERVAL")
+	_ = viper.BindEnv("poll_interval", "POLL_INTERVAL")
+	_ = viper.BindEnv("rate_limit", "RATE_LIMIT")
 	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
+	_ = viper.BindEnv("config", "CONFIG")
 
 	return rootCmd.Execute()
 

@@ -1,5 +1,5 @@
 {
-  "address": "localhost:8081",
+  "address": "localhost:8080",
   "restore": false,
   "store_interval": 1,
   "store_file": "",
