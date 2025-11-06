@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/jackc/pgx/v5/tracelog"
@@ -33,63 +34,57 @@ func (zl *ZapSugarLogger) Log(ctx context.Context, level tracelog.LogLevel, msg 
 	}
 }
 
-func Initialize() {
+func Initialize() error {
+	var err error
 	sync.OnceFunc(func() {
 		cfg := zap.NewDevelopmentConfig()
 		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 
-		logger, err := cfg.Build()
-		if err != nil {
-			panic(err)
+		logger, errLogger := cfg.Build(zap.AddCallerSkip(1))
+		if errLogger != nil {
+			err = fmt.Errorf("could not initialize zap logger: %w", errLogger)
 		}
 
 		sLog = &ZapSugarLogger{SugaredLogger: logger.Sugar()}
 	})()
+	return err
 }
 
 func GetLogger() *ZapSugarLogger {
 	if sLog == nil {
-		Initialize()
-		return sLog
-	}
-	return sLog
-}
-
-func getLogger() *ZapSugarLogger {
-	if sLog == nil {
-		Initialize()
+		_ = Initialize()
 		return sLog
 	}
 	return sLog
 }
 
 func Info(msg string) {
-	getLogger().Info(msg)
+	GetLogger().Info(msg)
 }
 func Infof(msg string, args ...any) {
-	getLogger().Infof(msg, args...)
+	GetLogger().Infof(msg, args...)
 }
 func Warn(msg string) {
-	getLogger().Warn(msg)
+	GetLogger().Warn(msg)
 }
 func Warnf(msg string, args ...any) {
-	getLogger().Warnf(msg, args...)
+	GetLogger().Warnf(msg, args...)
 }
 func Error(err error) {
-	getLogger().Error(err)
+	GetLogger().Error(err)
 }
 func Errorf(msg string, args ...any) {
-	getLogger().Errorf(msg, args...)
+	GetLogger().Errorf(msg, args...)
 }
 func Fatal(args ...any) {
-	getLogger().Fatal(args...)
+	GetLogger().Fatal(args...)
 }
 func Fatalf(msg string, args ...any) {
-	getLogger().Fatalf(msg, args...)
+	GetLogger().Fatalf(msg, args...)
 }
 func Panic(msg string) {
-	getLogger().Panic(msg)
+	GetLogger().Panic(msg)
 }
 func Panicf(msg string, args ...any) {
-	getLogger().Panicf(msg, args...)
+	GetLogger().Panicf(msg, args...)
 }

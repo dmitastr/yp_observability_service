@@ -1,0 +1,58 @@
+package panicanalyzer
+
+import (
+	"go/ast"
+	"go/types"
+
+	"golang.org/x/tools/go/analysis"
+)
+
+var PanicFatalAnalyzer = &analysis.Analyzer{
+	Name: "panicFatalAnalyzer",
+	Doc:  "check for usage of panic, log.Fatal and os.Exit outside of main package",
+	Run:  run,
+}
+
+func run(pass *analysis.Pass) (interface{}, error) {
+	for _, f := range pass.Files {
+		isMain := f.Name.Name == "main"
+		var currentFunc *ast.FuncDecl
+
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch expr := n.(type) {
+			case *ast.FuncDecl:
+				currentFunc = expr
+			case *ast.CallExpr:
+				if id, ok := expr.Fun.(*ast.Ident); ok && id.Name == "panic" {
+					pass.Reportf(n.Pos(), "panic call")
+				}
+			case *ast.SelectorExpr:
+				if currentFunc != nil && currentFunc.Name.Name == "main" && isMain {
+					return true
+				}
+
+				pkg, ok := expr.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				pkgName := pkg.Name
+				funcName := expr.Sel.Name
+
+				pkgObj := pass.TypesInfo.Uses[pkg]
+				if pkgImport, ok := pkgObj.(*types.PkgName); ok {
+					pkgName = pkgImport.Imported().Name()
+				}
+
+				if pkgName == "os" && funcName == "Exit" {
+					pass.Reportf(n.Pos(), "os.Exit call outside of main")
+				} else if pkgName == "log" && funcName == "Fatal" {
+					pass.Reportf(n.Pos(), "log.Fatal call outside of main")
+
+				}
+			}
+
+			return true
+		})
+	}
+	return nil, nil
+}

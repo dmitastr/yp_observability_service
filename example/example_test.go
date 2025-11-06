@@ -10,7 +10,7 @@ import (
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/models"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
-	"github.com/dmitastr/yp_observability_service/internal/mocks"
+	service2 "github.com/dmitastr/yp_observability_service/internal/mocks/service"
 	getmetric "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
 	pingdatabase "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/ping_database"
 	updatemetric "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
@@ -29,7 +29,7 @@ func serviceSetup() service.IService {
 	}
 
 	ctrl := gomock.NewController(&testing.T{})
-	observabilityService := mocks.NewMockServiceAbstract(ctrl)
+	observabilityService := service2.NewMockServiceAbstract(ctrl)
 	observabilityService.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, err).AnyTimes()
 	observabilityService.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(err).AnyTimes()
 	observabilityService.EXPECT().BatchUpdate(gomock.Any(), gomock.Any()).Return(err).AnyTimes()
