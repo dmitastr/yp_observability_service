@@ -15,23 +15,22 @@ var PanicFatalAnalyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, f := range pass.Files {
-		var isMain bool
+		isMain := f.Name.Name == "main"
+		var currentFunc *ast.FuncDecl
+
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch expr := n.(type) {
 			case *ast.FuncDecl:
-				if expr.Name.Name == "main" && f.Name.Name == "main" {
-					isMain = true
-					return true
-				}
-				isMain = false
+				currentFunc = expr
 			case *ast.CallExpr:
 				if id, ok := expr.Fun.(*ast.Ident); ok && id.Name == "panic" {
 					pass.Reportf(n.Pos(), "panic call")
 				}
 			case *ast.SelectorExpr:
-				if isMain {
+				if currentFunc != nil && currentFunc.Name.Name == "main" && isMain {
 					return true
 				}
+
 				pkg, ok := expr.X.(*ast.Ident)
 				if !ok {
 					return true
