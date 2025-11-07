@@ -120,6 +120,7 @@ func (pg *Postgres) Ping(ctx context.Context) error {
 }
 
 func (pg *Postgres) Close() error {
+	logger.Info("Closing database connection")
 	pg.db.Close()
 	return nil
 }

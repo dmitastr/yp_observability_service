@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
@@ -15,6 +17,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/repository/postgres_storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
@@ -36,23 +39,23 @@ import (
 
 // NewServer creates a new server, register all handlers and middleware
 // and inject necessary dependencies
-func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface.Database, err error) {
+func NewServer(ctx context.Context, cfg serverenvconfig.Config) (server *http.Server, storage dbinterface.Database, err error) {
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
 
 	} else {
-		storage, err = postgresstorage.NewPG(context.TODO(), cfg)
+		storage, err = postgresstorage.NewPG(ctx, cfg)
 		if err != nil {
-			return router, storage, fmt.Errorf("error creating postgres storage: %w", err)
+			return nil, storage, fmt.Errorf("error creating postgres storage: %w", err)
 		}
 	}
 	if err = storage.Init("file://migrations"); err != nil {
-		return router, storage, fmt.Errorf("error initializing postgres storage: %w", err)
+		return nil, storage, fmt.Errorf("error initializing postgres storage: %w", err)
 	}
 
-	// Set path for profiling
-	router = chi.NewRouter()
+	router := chi.NewRouter()
+
 	pinger := postgrespinger.New()
 	auditor := audit.NewAuditor().
 		AddListener(listener.NewListener(listener.FileListenerType, cfg.AuditFile)).
@@ -69,14 +72,17 @@ func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface
 	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
 
 	// middleware
+	// gracefulShutdownHandler := gracefulshutdown.NewGracefulShutdownHandler(cancelCh)
 	router.Use(
 		requestlogger.Handle,
 		rsaDecodeHandler.Handle,
 		signedCheckHandler.Handle,
 	)
 
-	// setting routes
+	// Set path for profiling
 	router.Mount("/debug", middleware.Profiler())
+
+	// setting routes
 	router.Group(func(r chi.Router) {
 		r.Use(compress.HandleCompression)
 		r.Get(`/`, listMetricsHandler.ServeHTTP)
@@ -100,12 +106,21 @@ func NewServer(cfg serverenvconfig.Config) (router *chi.Mux, storage dbinterface
 		})
 
 	})
+	server = &http.Server{
+		Addr:              *cfg.Address,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		Handler:           router,
+		BaseContext: func(listener net.Listener) context.Context {
+			return ctx
+		},
+	}
 
 	return
 }
 
 // Run initialized [cobra.Command] for args parsing and starts the server
-func Run() error {
+func Run(ctx context.Context) error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability service",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -125,15 +140,33 @@ func Run() error {
 				logger.Errorf("Unable to decode into struct, %v\n", err)
 				return err
 			}
-			router, postgresDB, err := NewServer(cfg)
-			defer postgresDB.Close()
+			server, postgresDB, err := NewServer(ctx, cfg)
 			if err != nil {
 				return err
 			}
 
-			logger.Infof("Starting server with config: %#v\n", cfg)
-			if err := http.ListenAndServe(*cfg.Address, router); err != nil {
-				return err
+			logger.Infof("Starting server with config: %s\n", cfg.String())
+			// if err := http.ListenAndServe(*cfg.Address, router); err != nil {
+			// 	return err
+			// }
+
+			g, gCtx := errgroup.WithContext(ctx)
+			g.Go(func() error {
+				return server.ListenAndServe()
+			})
+			g.Go(func() error {
+				<-gCtx.Done()
+				shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				return server.Shutdown(shutdownCtx)
+			})
+			g.Go(func() error {
+				<-gCtx.Done()
+				return postgresDB.Close()
+			})
+
+			if err := g.Wait(); err != nil {
+				logger.Infof("exit reason: %v", err)
 			}
 
 			return nil
