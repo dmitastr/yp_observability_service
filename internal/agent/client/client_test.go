@@ -93,7 +93,7 @@ func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 
 func TestAgent_SendMetric(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("send request to url=%s\n", r.URL)
+		fmt.Fprintf(w, "send request to url=%s\n", r.URL)
 	}))
 	defer srv.Close()
 
@@ -150,7 +150,7 @@ func TestAgent_SendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.agent.SendData(tt.args.reportInterval)
+			tt.agent.SendData(t.Context(), tt.args.reportInterval)
 		})
 	}
 }

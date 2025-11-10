@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -145,21 +146,26 @@ func Run(ctx context.Context) error {
 				return err
 			}
 
-			logger.Infof("Starting server with config: %s\n", cfg.String())
-			// if err := http.ListenAndServe(*cfg.Address, router); err != nil {
-			// 	return err
-			// }
-
 			g, gCtx := errgroup.WithContext(ctx)
+			// Server goroutine
 			g.Go(func() error {
-				return server.ListenAndServe()
+				logger.Infof("Starting server with config: %s\n", cfg.String())
+				if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					return fmt.Errorf("server error: %w", err)
+				}
+				logger.Info("Server stopped")
+				return nil
 			})
+
+			// Server shutdown goroutine
 			g.Go(func() error {
 				<-gCtx.Done()
 				shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
 				return server.Shutdown(shutdownCtx)
 			})
+
+			// Database closing goroutine
 			g.Go(func() error {
 				<-gCtx.Done()
 				return postgresDB.Close()

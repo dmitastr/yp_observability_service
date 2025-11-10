@@ -28,7 +28,7 @@ func main() {
 	go func() {
 		signal.Notify(cancelCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 		<-cancelCh
-		logger.Info("\nReceived an interrupt, shutting down...")
+		logger.Info("Received an interrupt, shutting down...")
 		cancel()
 	}()
 

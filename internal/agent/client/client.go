@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -68,7 +69,7 @@ const (
 )
 
 // Run initialized [cobra.Command] for args parsing and starts the server
-func Run() error {
+func Run(ctx context.Context) error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,7 +98,7 @@ func Run() error {
 				*cfg.ReportInterval,
 			)
 
-			agent.Run(*cfg.PollInterval, *cfg.ReportInterval)
+			agent.Run(ctx, *cfg.PollInterval, *cfg.ReportInterval)
 
 			return nil
 		},
@@ -240,11 +241,14 @@ func (agent *Agent) UpdateRuntimeMetrics() {
 	agent.UpdateMetricValueCounter(PollCount, 1)
 }
 
-func (agent *Agent) Update(pollInterval int) {
-
+func (agent *Agent) Update(ctx context.Context, pollInterval int) {
 	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
+	select {
+	case <-ctx.Done():
+		logger.Info("Shutting down data polling goroutine")
+		return
+	case <-ticker.C:
 		go agent.UpdateRuntimeMetrics()
 		go agent.UpdateSysUtilMetrics()
 	}
@@ -320,10 +324,7 @@ func (agent *Agent) SendMetric(key string) error {
 }
 
 func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<- Result) error {
-	// defer close(resultCh)
-
 	metrics := <-inCh
-	// metrics := agent.toList()
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
@@ -400,19 +401,23 @@ func (agent *Agent) WorkerPoolCreation() error {
 	return nil
 }
 
-func (agent *Agent) SendData(reportInterval int) {
+func (agent *Agent) SendData(ctx context.Context, reportInterval int) {
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
+	select {
+	case <-ticker.C:
 		if err := agent.WorkerPoolCreation(); err != nil {
 			logger.Error(err)
 		}
+	case <-ctx.Done():
+		logger.Info("Shutting down report data goroutine")
+		return
 	}
 }
 
-func (agent *Agent) Run(pollInterval int, reportInterval int) {
-	go agent.Update(pollInterval)
-	agent.SendData(reportInterval)
+func (agent *Agent) Run(ctx context.Context, pollInterval int, reportInterval int) {
+	go agent.Update(ctx, pollInterval)
+	agent.SendData(ctx, reportInterval)
 }
 
 func (agent *Agent) Encode(data []byte) ([]byte, error) {
