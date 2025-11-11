@@ -1,6 +1,0 @@
-{
-  "address": "localhost:8080",
-  "poll_interval": 6,
-  "report_interval": 12,
-  "crypto_key": "/certificates/cert.pem"
-}
