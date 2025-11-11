@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	_ "net/http/pprof"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -22,14 +21,10 @@ func main() {
 	logger.Infof("Build data: %s\n", buildDate)
 	logger.Infof("Build commit: %s\n", buildCommit)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	cancelCh := make(chan os.Signal, 1)
-	go func() {
-		signal.Notify(cancelCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-		<-cancelCh
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer func() {
 		logger.Info("Received an interrupt, shutting down...")
-		cancel()
+		stop()
 	}()
 
 	if err := server.Run(ctx); err != nil {
