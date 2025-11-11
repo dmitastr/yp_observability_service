@@ -38,3 +38,8 @@ data/*
 # RSA keys
 certificates
 
+# Configs
+configs/*
+!configs/server_config_example.json
+!configs/agent_config_example.json
+
