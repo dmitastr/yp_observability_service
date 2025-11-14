@@ -6,39 +6,34 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"os"
-
-	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
 type Encoder struct {
 	pubKey *rsa.PublicKey
 }
 
-func NewEncoder(publicKeyFile string) (c *Encoder) {
-	c = new(Encoder)
+func NewEncoder(publicKeyFile string) (*Encoder, error) {
+	c := new(Encoder)
 	key, err := os.ReadFile(publicKeyFile)
 	if err != nil {
-		logger.Infof("Failed to read private key file: %v\n", err)
-		return
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
 	}
 	publicPem, _ := pem.Decode(key)
 	if publicPem == nil {
-		logger.Info("Public key not found")
-		return
+		return nil, fmt.Errorf("public key not found")
 	}
 	publicKey, err := x509.ParseCertificate(publicPem.Bytes)
 	if err != nil {
-		logger.Infof("Failed to parse public key: %v\n", err)
-		return
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
 	}
 	pubKeyParsed, ok := publicKey.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		logger.Infof("Failed to parse public key\n")
-		return
+		return nil, fmt.Errorf("failed to parse public key")
 	}
 	c.pubKey = pubKeyParsed
-	return
+	return c, nil
 }
 
 func (c *Encoder) Encode(data []byte) ([]byte, error) {

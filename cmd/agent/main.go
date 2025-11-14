@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	client "github.com/dmitastr/yp_observability_service/internal/agent/init"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
 
@@ -21,14 +20,10 @@ func main() {
 	logger.Infof("Build data: %s\n", buildDate)
 	logger.Infof("Build commit: %s\n", buildCommit)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	cancelCh := make(chan os.Signal, 1)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	go func() {
-		signal.Notify(cancelCh, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-		<-cancelCh
 		logger.Info("Received an interrupt, shutting down...")
-		cancel()
+		stop()
 	}()
 
 	if err := client.Run(ctx); err != nil {

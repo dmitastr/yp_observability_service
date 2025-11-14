@@ -21,8 +21,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
 
 	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/common"
@@ -68,67 +67,6 @@ const (
 	CPUutilization1 = "CPUUtilization1"
 )
 
-// Run initialized [cobra.Command] for args parsing and starts the server
-func Run(ctx context.Context) error {
-	rootCmd := &cobra.Command{
-		Use: "YP observability agent",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := logger.Initialize(); err != nil {
-				return err
-			}
-
-			if cfgPath := viper.GetString("config"); cfgPath != "" {
-				viper.SetConfigFile(cfgPath)
-				if err := viper.ReadInConfig(); err != nil {
-					logger.Errorf("Error reading config file, %s\n", err)
-				}
-			}
-
-			var cfg config.Config
-			// Unmarshal the configuration into the Config struct
-			if err := viper.Unmarshal(&cfg); err != nil {
-				logger.Errorf("Unable to decode into struct, %v\n", err)
-				return err
-			}
-			agent := NewAgent(cfg)
-
-			logger.Infof("Starting client for server=%s, poll interval=%d, report interval=%d",
-				*cfg.Address,
-				*cfg.PollInterval,
-				*cfg.ReportInterval,
-			)
-
-			agent.Run(ctx, *cfg.PollInterval, *cfg.ReportInterval)
-
-			return nil
-		},
-	}
-
-	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
-	rootCmd.Flags().IntP("report_interval", "r", 10, "frequency of data sending to server in seconds")
-	rootCmd.Flags().IntP("poll_interval", "p", 10, "frequency of metric polling from source in seconds")
-	rootCmd.Flags().IntP("rate_limit", "l", 3, "rate limit")
-	rootCmd.Flags().String("k", "", "key for request signing")
-	rootCmd.Flags().String("crypto-key", "", "path to file with public key")
-	rootCmd.Flags().StringP("config", "c", "", "path to config file")
-
-	_ = viper.BindPFlags(rootCmd.Flags())
-
-	viper.AutomaticEnv()
-
-	// Bind environment variables
-	_ = viper.BindEnv("address", "ADDRESS")
-	_ = viper.BindEnv("k", "KEY")
-	_ = viper.BindEnv("report_interval", "REPORT_INTERVAL")
-	_ = viper.BindEnv("poll_interval", "POLL_INTERVAL")
-	_ = viper.BindEnv("rate_limit", "RATE_LIMIT")
-	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
-	_ = viper.BindEnv("config", "CONFIG")
-
-	return rootCmd.Execute()
-
-}
-
 type Result struct {
 	err error
 }
@@ -143,7 +81,7 @@ type Agent struct {
 	encoder    *rsaencoder.Encoder
 }
 
-func NewAgent(cfg config.Config) *Agent {
+func NewAgent(cfg config.Config) (*Agent, error) {
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Timeout = time.Millisecond * 300
 	client.RetryMax = 3
@@ -165,9 +103,15 @@ func NewAgent(cfg config.Config) *Agent {
 	}
 
 	if cfg.PublicKeyFile != nil && *cfg.PublicKeyFile != "" {
-		agent.encoder = rsaencoder.NewEncoder(*cfg.PublicKeyFile)
+		encoder, err := rsaencoder.NewEncoder(*cfg.PublicKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("error creating rsa encoder: %w", err)
+		}
+		agent.encoder = encoder
+
 	}
-	return &agent
+
+	return &agent, nil
 }
 
 func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
@@ -188,24 +132,11 @@ func (agent *Agent) UpdateMetricValueGauge(key string, value float64) {
 	pc.UpdateValue(value)
 }
 
-func (agent *Agent) UpdateSysUtilMetrics() {
+func (agent *Agent) UpdateMetrics() error {
 	agent.Mutex.Lock()
 	defer agent.Mutex.Unlock()
 
-	v, _ := mem.VirtualMemory()
-
-	agent.UpdateMetricValueGauge(TotalMemory, float64(v.Total))
-	agent.UpdateMetricValueGauge(FreeMemory, float64(v.Free))
-	cpuStats, _ := cpu.Info()
-	if len(cpuStats) > 0 {
-		agent.UpdateMetricValueGauge(CPUutilization1, float64(cpuStats[0].CPU))
-	}
-}
-
-func (agent *Agent) UpdateRuntimeMetrics() {
-	agent.Mutex.Lock()
-	defer agent.Mutex.Unlock()
-
+	// Update runtime metrics
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 
@@ -239,19 +170,20 @@ func (agent *Agent) UpdateRuntimeMetrics() {
 	agent.UpdateMetricValueGauge(RandomValue, 100*rand.Float64())
 
 	agent.UpdateMetricValueCounter(PollCount, 1)
-}
 
-func (agent *Agent) Update(ctx context.Context, pollInterval int) {
-	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
-	defer ticker.Stop()
-	select {
-	case <-ctx.Done():
-		logger.Info("Shutting down data polling goroutine")
-		return
-	case <-ticker.C:
-		go agent.UpdateRuntimeMetrics()
-		go agent.UpdateSysUtilMetrics()
+	// Update sys utils metrics
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return fmt.Errorf("error getting virtual memory info: %w", err)
 	}
+
+	agent.UpdateMetricValueGauge(TotalMemory, float64(v.Total))
+	agent.UpdateMetricValueGauge(FreeMemory, float64(v.Free))
+	cpuStats, _ := cpu.Info()
+	if len(cpuStats) > 0 {
+		agent.UpdateMetricValueGauge(CPUutilization1, float64(cpuStats[0].CPU))
+	}
+	return nil
 }
 
 func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
@@ -323,13 +255,10 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
-func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<- Result) error {
-	metrics := <-inCh
-
+func (agent *Agent) SendMetricsBatch(metrics []model.Metric) error {
 	data, err := json.Marshal(metrics)
 	if err != nil {
-		resultCh <- Result{err: fmt.Errorf("failed to marshal metrics: %w", err)}
-		return err
+		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
 	logger.Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
@@ -339,13 +268,12 @@ func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<-
 		if resp != nil {
 			resp.Body.Close()
 		}
-		resultCh <- Result{err: fmt.Errorf("failed to send metrics: %w", err)}
-		return err
+		return fmt.Errorf("failed to send metrics: %w", err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		resultCh <- Result{err: fmt.Errorf("failed to read response body: %w", err)}
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -358,66 +286,6 @@ func (agent *Agent) toList() (metrics []model.Metric) {
 		metrics = append(metrics, metric)
 	}
 	return
-}
-
-func (agent *Agent) WorkerPoolCreation() error {
-	var wg sync.WaitGroup
-	logger.Infof("Starting worker pool creation")
-
-	metrics := agent.toList()
-
-	resultCh := make(chan Result, agent.RateLimit)
-	inCh := make(chan []model.Metric, agent.RateLimit)
-
-	for w := range agent.RateLimit {
-		wg.Add(1)
-		logger.Infof("Worker %d starting", w)
-		go func() {
-			_ = agent.SendMetricsBatch(inCh, resultCh)
-			wg.Done()
-		}()
-	}
-
-	chunkSize := int(math.Ceil(float64(len(metrics)) / float64(agent.RateLimit)))
-	for i := 0; i < len(metrics); i += chunkSize {
-		end := i + chunkSize
-		if end > len(metrics) {
-			end = len(metrics)
-		}
-		inCh <- metrics[i:end]
-	}
-	close(inCh)
-
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
-
-	for res := range resultCh {
-		if res.err != nil {
-			logger.Errorf("failed to send metrics batch: %v", res.err)
-		}
-	}
-	return nil
-}
-
-func (agent *Agent) SendData(ctx context.Context, reportInterval int) {
-	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
-	defer ticker.Stop()
-	select {
-	case <-ticker.C:
-		if err := agent.WorkerPoolCreation(); err != nil {
-			logger.Error(err)
-		}
-	case <-ctx.Done():
-		logger.Info("Shutting down report data goroutine")
-		return
-	}
-}
-
-func (agent *Agent) Run(ctx context.Context, pollInterval int, reportInterval int) {
-	go agent.Update(ctx, pollInterval)
-	agent.SendData(ctx, reportInterval)
 }
 
 func (agent *Agent) Encode(data []byte) ([]byte, error) {
@@ -438,4 +306,92 @@ func (agent *Agent) compress(data []byte) ([]byte, error) {
 		logger.Errorf("failed to close gzip writer: %v", err)
 	}
 	return compressed.Bytes(), nil
+}
+
+func (agent *Agent) calculateChunkSize() int {
+	return int(math.Ceil(float64(len(agent.Metrics)) / float64(agent.RateLimit)))
+}
+
+func (agent *Agent) FeedWorkers(inCh chan []model.Metric) {
+	metrics := agent.toList()
+	chunkSize := agent.calculateChunkSize()
+
+	for i := 0; i < len(metrics); i += chunkSize {
+		end := i + chunkSize
+		if end > len(metrics) {
+			end = len(metrics)
+		}
+		inCh <- metrics[i:end]
+	}
+}
+
+func (agent *Agent) startWorkers(ctx context.Context, inCh chan []model.Metric) error {
+	g, gCtx := errgroup.WithContext(ctx)
+	for w := range agent.RateLimit {
+		logger.Infof("Worker %d starting", w)
+		g.Go(func() error {
+			for {
+				select {
+				case <-gCtx.Done():
+					logger.Infof("Worker %d shutting down", w)
+					return nil
+
+				case batch := <-inCh:
+					if err := agent.SendMetricsBatch(batch); err != nil {
+						return err
+					}
+				}
+			}
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("failed to start workers: %w", err)
+	}
+	return nil
+}
+
+func (agent *Agent) Run(ctx context.Context, pollInterval int, reportInterval int) error {
+	batchCh := make(chan []model.Metric)
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	// Start workers to read batches of data
+	g.Go(func() error {
+		return agent.startWorkers(ctx, batchCh)
+	})
+
+	// Create batches of data
+	g.Go(func() error {
+		ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-gCtx.Done():
+				logger.Info("Shutting down report data goroutine")
+				return nil
+			case <-ticker.C:
+				agent.FeedWorkers(batchCh)
+			}
+		}
+	})
+
+	// Collect stats
+	g.Go(func() error {
+		ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-gCtx.Done():
+				logger.Info("Shutting down report data goroutine")
+				return nil
+			case <-ticker.C:
+				if err := agent.UpdateMetrics(); err != nil {
+					return fmt.Errorf("failed to update metrics: %w", err)
+				}
+			}
+		}
+	})
+
+	return g.Wait()
 }
