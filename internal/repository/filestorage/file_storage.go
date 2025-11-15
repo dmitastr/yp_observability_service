@@ -15,7 +15,7 @@ type FileStorage struct {
 	FileName      string
 }
 
-func New(cfg serverenvconfig.Config) *FileStorage {
+func New(cfg *serverenvconfig.Config) *FileStorage {
 	return &FileStorage{StoreInterval: *cfg.StoreInterval, FileName: *cfg.FileStoragePath}
 }
 

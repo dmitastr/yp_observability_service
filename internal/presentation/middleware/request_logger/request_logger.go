@@ -44,9 +44,9 @@ func (rww LoggingResponseWriter) WriteHeader(statusCode int) {
 	rww.w.WriteHeader(statusCode)
 }
 
-// RequestLogger middleware logs request method, URI and response status code, calculates time of execution
+// Handle middleware logs request method, URI and response status code, calculates time of execution
 // and response body size
-func RequestLogger(h http.Handler) http.Handler {
+func Handle(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rww := NewLoggingResponseWriter(w)

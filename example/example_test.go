@@ -29,7 +29,7 @@ func serviceSetup() service.IService {
 	}
 
 	ctrl := gomock.NewController(&testing.T{})
-	observabilityService := service2.NewMockServiceAbstract(ctrl)
+	observabilityService := service2.NewMockIService(ctrl)
 	observabilityService.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, err).AnyTimes()
 	observabilityService.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(err).AnyTimes()
 	observabilityService.EXPECT().BatchUpdate(gomock.Any(), gomock.Any()).Return(err).AnyTimes()

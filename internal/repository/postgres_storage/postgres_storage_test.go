@@ -25,7 +25,7 @@ func (suite *MetricsRepoTestSuite) SetupSuite() {
 		suite.T().Log("Error creating postgres container", err)
 	}
 	suite.pgContainer = pgContainer
-	db, err := NewPG(suite.ctx, serverenvconfig.Config{DBUrl: &suite.pgContainer.ConnectionString})
+	db, err := NewPG(suite.ctx, &serverenvconfig.Config{DBUrl: &suite.pgContainer.ConnectionString})
 	if err != nil {
 		suite.T().Log("Error database instance", err)
 	}
