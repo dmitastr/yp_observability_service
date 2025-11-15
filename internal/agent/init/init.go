@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Run initialized [cobra.Command] for args parsing and starts the server
+// Run initialized [cobra.Command] for args parsing and starts the app
 func Run(ctx context.Context) error {
 	rootCmd := &cobra.Command{
 		Use: "YP observability agent",
@@ -24,21 +24,21 @@ func Run(ctx context.Context) error {
 			if cfgPath := viper.GetString("config"); cfgPath != "" {
 				viper.SetConfigFile(cfgPath)
 				if err := viper.ReadInConfig(); err != nil {
-					return fmt.Errorf("Error reading config file: %w\n", err)
+					return fmt.Errorf("error reading config file: %w\n", err)
 				}
 			}
 
 			var cfg config.Config
 			// Unmarshal the configuration into the Config struct
 			if err := viper.Unmarshal(&cfg); err != nil {
-				return fmt.Errorf("Unable to decode agent config: %w\n", err)
+				return fmt.Errorf("unable to decode agent config: %w\n", err)
 			}
 			agent, err := client.NewAgent(cfg)
 			if err != nil {
-				return fmt.Errorf("Error initializing agent: %w\n", err)
+				return fmt.Errorf("error initializing agent: %w\n", err)
 			}
 
-			logger.Infof("Starting client for server=%s, poll interval=%d, report interval=%d",
+			logger.Infof("Starting client for app=%s, poll interval=%d, report interval=%d",
 				*cfg.Address,
 				*cfg.PollInterval,
 				*cfg.ReportInterval,
@@ -48,8 +48,8 @@ func Run(ctx context.Context) error {
 		},
 	}
 
-	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set server host and port")
-	rootCmd.Flags().IntP("report_interval", "r", 10, "frequency of data sending to server in seconds")
+	rootCmd.Flags().StringP("address", "a", "localhost:8080", "set app host and port")
+	rootCmd.Flags().IntP("report_interval", "r", 10, "frequency of data sending to app in seconds")
 	rootCmd.Flags().IntP("poll_interval", "p", 10, "frequency of metric polling from source in seconds")
 	rootCmd.Flags().IntP("rate_limit", "l", 3, "rate limit")
 	rootCmd.Flags().String("k", "", "key for request signing")

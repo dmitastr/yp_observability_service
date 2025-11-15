@@ -43,7 +43,7 @@ type Storage struct {
 	Restore       bool
 }
 
-func NewStorage(cfg serverenvconfig.Config, bm backupmanager.BackupManager) *Storage {
+func NewStorage(cfg *serverenvconfig.Config, bm backupmanager.BackupManager) *Storage {
 	storage := Storage{Metrics: make(map[string]models.Metrics)}
 	if *cfg.StoreInterval == 0 {
 		storage.StreamWrite = true

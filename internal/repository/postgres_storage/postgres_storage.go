@@ -56,7 +56,7 @@ const query string = `INSERT INTO metrics (name, mtype, value, delta)
 	value = @value, 
     delta = @delta `
 
-func NewPG(ctx context.Context, cfg serverenvconfig.Config) (*Postgres, error) {
+func NewPG(ctx context.Context, cfg *serverenvconfig.Config) (*Postgres, error) {
 	dbConfig, err := pgxpool.ParseConfig(*cfg.DBUrl)
 	if err != nil {
 		logger.Fatalf("Failed to parse memstorage config: %v", err)
@@ -123,13 +123,7 @@ func (pg *Postgres) Ping(ctx context.Context) error {
 
 func (pg *Postgres) Close() error {
 	logger.Info("Closing database connection")
-
-	// Wait for any pending operations, within reasonable time
-	_, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	pg.db.Close()
-	logger.Info("Datasource closed successfully")
 	return nil
 }
 

@@ -36,7 +36,7 @@ type SignedChecker struct {
 	HashSigner *signature.HashSigner
 }
 
-func NewSignedChecker(cfg serverenvconfig.Config) *SignedChecker {
+func NewSignedChecker(cfg *serverenvconfig.Config) *SignedChecker {
 	hs := signature.NewHashSigner(cfg.Key)
 	return &SignedChecker{HashSigner: hs}
 }

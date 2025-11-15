@@ -60,7 +60,7 @@ func TestBatchUpdateHandler_ServeHTTP(t *testing.T) {
 			serviceErrOut: true,
 		},
 		{
-			name:     "server returned an error",
+			name:     "app returned an error",
 			method:   http.MethodPost,
 			url:      "/updates",
 			wantCode: http.StatusInternalServerError,
