@@ -20,6 +20,7 @@ type Config struct {
 	AuditFile       *string `env:"AUDIT_FILE" mapstructure:"audit-file"`
 	AuditURL        *string `env:"AUDIT_URL" mapstructure:"audit-url"`
 	PrivateKeyPath  *string `env:"CRYPTO_KEY" mapstructure:"crypto-key"`
+	TrustedSubnet   *string `env:"TRUSTED_SUBNET" mapstructure:"trusted_subnet"`
 }
 
 // New reads command line and env arguments, reads config file if any
@@ -36,6 +37,7 @@ func New() (*Config, error) {
 	flagSet.String("audit-url", "", "url for audit logs")
 	flagSet.String("crypto-key", "", "path to file with private key")
 	flagSet.StringP("config", "c", "", "path to config file")
+	flagSet.StringP("trusted_subnet", "t", "", "trusted subnet in CIDR format")
 
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
 		return nil, fmt.Errorf("error parsing flags: %w", err)
@@ -56,6 +58,7 @@ func New() (*Config, error) {
 	_ = viper.BindEnv("audit-url", "AUDIT_URL")
 	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
 	_ = viper.BindEnv("config", "CONFIG")
+	_ = viper.BindEnv("trusted_subnet", "TRUSTED_SUBNET")
 
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
 		viper.SetConfigFile(cfgPath)

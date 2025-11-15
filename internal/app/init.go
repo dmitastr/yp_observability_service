@@ -13,6 +13,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/certdecode"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/ipchecker"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
 	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
 	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
@@ -71,9 +72,14 @@ func NewApp(ctx context.Context) (*http.Server, dbinterface.Database, error) {
 	pingHandler := pingdatabase.New(observabilityService)
 	signedCheckHandler := hash.NewSignedChecker(cfg)
 	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
+	ipValidator, err := ipchecker.New(*cfg.TrustedSubnet)
+	if err != nil {
+		return nil, storage, fmt.Errorf("error creating ip validator: %w", err)
+	}
 
 	// middleware
 	router.Use(
+		ipValidator.Handle,
 		requestlogger.Handle,
 		rsaDecodeHandler.Handle,
 		signedCheckHandler.Handle,
