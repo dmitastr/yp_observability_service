@@ -89,7 +89,7 @@ func TestMetricHandler_ServeHTTP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.url, nil)
 
-			mockSrv := service.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockIService(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 
 			mockSrv.EXPECT().ProcessUpdate(gomock.Any(), gomock.Any()).Return(errValue).AnyTimes()
