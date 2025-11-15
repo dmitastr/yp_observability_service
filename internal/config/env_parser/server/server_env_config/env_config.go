@@ -60,14 +60,14 @@ func New() (*Config, error) {
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
 		viper.SetConfigFile(cfgPath)
 		if err := viper.ReadInConfig(); err != nil {
-			logger.Errorf("Error reading config file, %s\n", err)
+			logger.Errorf("error reading config file, %s\n", err)
 		}
 	}
 
 	var cfg Config
 	// Unmarshal the configuration into the Config struct
 	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("Unable to decode into struct, %w\n", err)
+		return nil, fmt.Errorf("unable to decode into struct, %w", err)
 	}
 	return &cfg, nil
 

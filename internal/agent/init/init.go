@@ -24,18 +24,18 @@ func Run(ctx context.Context) error {
 			if cfgPath := viper.GetString("config"); cfgPath != "" {
 				viper.SetConfigFile(cfgPath)
 				if err := viper.ReadInConfig(); err != nil {
-					return fmt.Errorf("error reading config file: %w\n", err)
+					return fmt.Errorf("error reading config file: %w", err)
 				}
 			}
 
 			var cfg config.Config
 			// Unmarshal the configuration into the Config struct
 			if err := viper.Unmarshal(&cfg); err != nil {
-				return fmt.Errorf("unable to decode agent config: %w\n", err)
+				return fmt.Errorf("unable to decode agent config: %w", err)
 			}
 			agent, err := client.NewAgent(cfg)
 			if err != nil {
-				return fmt.Errorf("error initializing agent: %w\n", err)
+				return fmt.Errorf("error initializing agent: %w", err)
 			}
 
 			logger.Infof("Starting client for app=%s, poll interval=%d, report interval=%d",
