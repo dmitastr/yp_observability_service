@@ -36,13 +36,13 @@ type SignedChecker struct {
 	HashSigner *signature.HashSigner
 }
 
-func NewSignedChecker(cfg serverenvconfig.Config) *SignedChecker {
+func NewSignedChecker(cfg *serverenvconfig.Config) *SignedChecker {
 	hs := signature.NewHashSigner(cfg.Key)
 	return &SignedChecker{HashSigner: hs}
 }
 
-// Check middleware is used for ensuring that request is signed correctly and signs response
-func (s *SignedChecker) Check(next http.Handler) http.Handler {
+// Handle middleware is used for ensuring that request is signed correctly and signs response
+func (s *SignedChecker) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		w := newWriter(res)
 		keyExist := s.HashSigner.KeyExist()

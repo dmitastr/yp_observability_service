@@ -3,11 +3,13 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -15,14 +17,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dmitastr/yp_observability_service/internal/agent/rsaencoder"
 	"github.com/dmitastr/yp_observability_service/internal/domain/signature"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
+	"golang.org/x/sync/errgroup"
 
 	model "github.com/dmitastr/yp_observability_service/internal/agent/metric"
 	"github.com/dmitastr/yp_observability_service/internal/common"
-	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
+	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 )
@@ -75,9 +79,11 @@ type Agent struct {
 	address    string
 	HashSigner *signature.HashSigner
 	RateLimit  int
+	encoder    *rsaencoder.Encoder
+	realAddr   net.Addr
 }
 
-func NewAgent(cfg agentenvconfig.Config) *Agent {
+func NewAgent(cfg config.Config) (*Agent, error) {
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Timeout = time.Millisecond * 300
 	client.RetryMax = 3
@@ -97,7 +103,21 @@ func NewAgent(cfg agentenvconfig.Config) *Agent {
 		HashSigner: signature.NewHashSigner(cfg.Key),
 		RateLimit:  *cfg.RateLimit,
 	}
-	return &agent
+
+	if cfg.PublicKeyFile != nil && *cfg.PublicKeyFile != "" {
+		encoder, err := rsaencoder.NewEncoder(*cfg.PublicKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("error creating rsa encoder: %w", err)
+		}
+		agent.encoder = encoder
+
+	}
+
+	if err := agent.setRealIP(); err != nil {
+		return nil, fmt.Errorf("error setting realIP: %w", err)
+	}
+
+	return &agent, nil
 }
 
 func (agent *Agent) UpdateMetricValueCounter(key string, value int64) {
@@ -118,24 +138,11 @@ func (agent *Agent) UpdateMetricValueGauge(key string, value float64) {
 	pc.UpdateValue(value)
 }
 
-func (agent *Agent) UpdateSysUtilMetrics() {
+func (agent *Agent) UpdateMetrics() error {
 	agent.Mutex.Lock()
 	defer agent.Mutex.Unlock()
 
-	v, _ := mem.VirtualMemory()
-
-	agent.UpdateMetricValueGauge(TotalMemory, float64(v.Total))
-	agent.UpdateMetricValueGauge(FreeMemory, float64(v.Free))
-	cpuStats, _ := cpu.Info()
-	if len(cpuStats) > 0 {
-		agent.UpdateMetricValueGauge(CPUutilization1, float64(cpuStats[0].CPU))
-	}
-}
-
-func (agent *Agent) UpdateRuntimeMetrics() {
-	agent.Mutex.Lock()
-	defer agent.Mutex.Unlock()
-
+	// Update runtime metrics
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 
@@ -169,42 +176,52 @@ func (agent *Agent) UpdateRuntimeMetrics() {
 	agent.UpdateMetricValueGauge(RandomValue, 100*rand.Float64())
 
 	agent.UpdateMetricValueCounter(PollCount, 1)
-}
 
-func (agent *Agent) Update(pollInterval int) {
-
-	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		go agent.UpdateRuntimeMetrics()
-		go agent.UpdateSysUtilMetrics()
+	// Update sys utils metrics
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return fmt.Errorf("error getting virtual memory info: %w", err)
 	}
+
+	agent.UpdateMetricValueGauge(TotalMemory, float64(v.Total))
+	agent.UpdateMetricValueGauge(FreeMemory, float64(v.Free))
+	cpuStats, _ := cpu.Info()
+	if len(cpuStats) > 0 {
+		agent.UpdateMetricValueGauge(CPUutilization1, float64(cpuStats[0].CPU))
+	}
+	return nil
 }
 
-func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
+func (agent *Agent) Post(ctx context.Context, url string, data []byte, compressed bool) (resp *http.Response, err error) {
 	var postData bytes.Buffer
 	var compression string
 
 	if compressed {
-		gw := gzip.NewWriter(&postData)
-		if _, err := gw.Write(data); err != nil {
-			return nil, err
-		}
-		if err := gw.Close(); err != nil {
+		data, err = agent.compress(data)
+		if err != nil {
 			logger.Errorf("failed to close gzip writer: %v", err)
 		}
 		compression = "gzip"
-	} else {
-		if _, err := postData.Write(data); err != nil {
-			logger.Errorf("failed to write uncompressed: %v", err)
-			return nil, err
-		}
 	}
 
-	req, err := retryablehttp.NewRequest(http.MethodPost, url, &postData)
+	encoded, err := agent.Encode(data)
+	if err != nil {
+		logger.Errorf("failed to encode post data: %v", err)
+	} else {
+		data = encoded
+	}
+
+	if _, err = postData.Write(data); err != nil {
+		logger.Errorf("failed to post data: %v", err)
+		return
+	}
+
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodPost, url, &postData)
 	if err != nil {
 		return
 	}
+
+	req.Header.Set("X-Real-IP", agent.realAddr.String())
 
 	if agent.HashSigner.KeyExist() {
 		hashSignature, err := agent.HashSigner.GenerateSignature(postData.Bytes())
@@ -220,7 +237,7 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 	return
 }
 
-func (agent *Agent) SendMetric(key string) error {
+func (agent *Agent) SendMetric(ctx context.Context, key string) error {
 	metric, ok := agent.Metrics[key]
 	if !ok {
 		return errs.ErrorMetricDoesNotExist
@@ -237,7 +254,7 @@ func (agent *Agent) SendMetric(key string) error {
 		return errs.ErrorWrongPath
 	}
 
-	if resp, err := agent.Post(postPath, data, true); err != nil {
+	if resp, err := agent.Post(ctx, postPath, data, true); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
@@ -246,32 +263,25 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
-func (agent *Agent) SendMetricsBatch(inCh <-chan []model.Metric, resultCh chan<- Result) error {
-	// defer close(resultCh)
-
-	metrics := <-inCh
-	// metrics := agent.toList()
-
+func (agent *Agent) SendMetricsBatch(ctx context.Context, metrics []model.Metric) error {
 	data, err := json.Marshal(metrics)
 	if err != nil {
-		resultCh <- Result{err: fmt.Errorf("failed to marshal metrics: %w", err)}
-		return err
+		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
 	logger.Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
 	postPath := agent.address + "/updates/"
-	resp, err := agent.Post(postPath, data, true)
+	resp, err := agent.Post(ctx, postPath, data, true)
 	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
-		resultCh <- Result{err: fmt.Errorf("failed to send metrics: %w", err)}
-		return err
+		return fmt.Errorf("failed to send metrics: %w", err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		resultCh <- Result{err: fmt.Errorf("failed to read response body: %w", err)}
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -286,25 +296,34 @@ func (agent *Agent) toList() (metrics []model.Metric) {
 	return
 }
 
-func (agent *Agent) WorkerPoolCreation() error {
-	var wg sync.WaitGroup
-	logger.Infof("Starting worker pool creation")
-
-	metrics := agent.toList()
-
-	resultCh := make(chan Result, agent.RateLimit)
-	inCh := make(chan []model.Metric, agent.RateLimit)
-
-	for w := range agent.RateLimit {
-		wg.Add(1)
-		logger.Infof("Worker %d starting", w)
-		go func() {
-			_ = agent.SendMetricsBatch(inCh, resultCh)
-			wg.Done()
-		}()
+func (agent *Agent) Encode(data []byte) ([]byte, error) {
+	if agent.encoder != nil {
+		return agent.encoder.Encode(data)
 	}
+	return data, nil
+}
 
-	chunkSize := int(math.Ceil(float64(len(metrics)) / float64(agent.RateLimit)))
+func (agent *Agent) compress(data []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+
+	gw := gzip.NewWriter(&compressed)
+	if _, err := gw.Write(data); err != nil {
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		logger.Errorf("failed to close gzip writer: %v", err)
+	}
+	return compressed.Bytes(), nil
+}
+
+func (agent *Agent) calculateChunkSize() int {
+	return int(math.Ceil(float64(len(agent.Metrics)) / float64(agent.RateLimit)))
+}
+
+func (agent *Agent) FeedWorkers(inCh chan []model.Metric) {
+	metrics := agent.toList()
+	chunkSize := agent.calculateChunkSize()
+
 	for i := 0; i < len(metrics); i += chunkSize {
 		end := i + chunkSize
 		if end > len(metrics) {
@@ -312,32 +331,88 @@ func (agent *Agent) WorkerPoolCreation() error {
 		}
 		inCh <- metrics[i:end]
 	}
-	close(inCh)
+}
 
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
+func (agent *Agent) startWorkers(ctx context.Context, inCh chan []model.Metric) error {
+	g, gCtx := errgroup.WithContext(ctx)
+	for w := range agent.RateLimit {
+		logger.Infof("Worker %d starting", w)
+		g.Go(func() error {
+			for {
+				select {
+				case <-gCtx.Done():
+					logger.Infof("Worker %d shutting down", w)
+					return nil
 
-	for res := range resultCh {
-		if res.err != nil {
-			logger.Errorf("failed to send metrics batch: %v", res.err)
-		}
+				case batch := <-inCh:
+					if err := agent.SendMetricsBatch(ctx, batch); err != nil {
+						return err
+					}
+				}
+			}
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("failed to start workers: %w", err)
 	}
 	return nil
 }
 
-func (agent *Agent) SendData(reportInterval int) {
-	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		if err := agent.WorkerPoolCreation(); err != nil {
-			logger.Error(err)
+func (agent *Agent) Run(ctx context.Context, pollInterval int, reportInterval int) error {
+	batchCh := make(chan []model.Metric)
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	// Start workers to read batches of data
+	g.Go(func() error {
+		return agent.startWorkers(ctx, batchCh)
+	})
+
+	// Create batches of data
+	g.Go(func() error {
+		ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-gCtx.Done():
+				logger.Info("Shutting down report data goroutine")
+				return nil
+			case <-ticker.C:
+				agent.FeedWorkers(batchCh)
+			}
 		}
-	}
+	})
+
+	// Collect stats
+	g.Go(func() error {
+		ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-gCtx.Done():
+				logger.Info("Shutting down report data goroutine")
+				return nil
+			case <-ticker.C:
+				if err := agent.UpdateMetrics(); err != nil {
+					return fmt.Errorf("failed to update metrics: %w", err)
+				}
+			}
+		}
+	})
+
+	return g.Wait()
 }
 
-func (agent *Agent) Run(pollInterval int, reportInterval int) {
-	go agent.Update(pollInterval)
-	agent.SendData(reportInterval)
+func (agent *Agent) setRealIP() error {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	agent.realAddr = localAddr
+
+	return nil
 }

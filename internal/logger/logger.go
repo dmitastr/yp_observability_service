@@ -38,7 +38,7 @@ func Initialize() error {
 	var err error
 	sync.OnceFunc(func() {
 		cfg := zap.NewDevelopmentConfig()
-		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 
 		logger, errLogger := cfg.Build(zap.AddCallerSkip(1))
 		if errLogger != nil {
