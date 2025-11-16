@@ -18,7 +18,7 @@ func Run(ctx context.Context) error {
 		Use: "YP observability agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := logger.Initialize(); err != nil {
-				return err
+				return fmt.Errorf("error initializing logger: %w", err)
 			}
 
 			if cfgPath := viper.GetString("config"); cfgPath != "" {

@@ -21,7 +21,7 @@ func main() {
 	logger.Infof("Build commit: %s\n", buildCommit)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	go func() {
+	defer func() {
 		logger.Info("Received an interrupt, shutting down...")
 		stop()
 	}()

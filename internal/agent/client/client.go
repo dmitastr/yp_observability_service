@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -79,6 +80,7 @@ type Agent struct {
 	HashSigner *signature.HashSigner
 	RateLimit  int
 	encoder    *rsaencoder.Encoder
+	realAddr   net.Addr
 }
 
 func NewAgent(cfg config.Config) (*Agent, error) {
@@ -109,6 +111,10 @@ func NewAgent(cfg config.Config) (*Agent, error) {
 		}
 		agent.encoder = encoder
 
+	}
+
+	if err := agent.setRealIP(); err != nil {
+		return nil, fmt.Errorf("error setting realIP: %w", err)
 	}
 
 	return &agent, nil
@@ -186,7 +192,7 @@ func (agent *Agent) UpdateMetrics() error {
 	return nil
 }
 
-func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.Response, err error) {
+func (agent *Agent) Post(ctx context.Context, url string, data []byte, compressed bool) (resp *http.Response, err error) {
 	var postData bytes.Buffer
 	var compression string
 
@@ -210,10 +216,12 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 		return
 	}
 
-	req, err := retryablehttp.NewRequest(http.MethodPost, url, &postData)
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodPost, url, &postData)
 	if err != nil {
 		return
 	}
+
+	req.Header.Set("X-Real-IP", agent.realAddr.String())
 
 	if agent.HashSigner.KeyExist() {
 		hashSignature, err := agent.HashSigner.GenerateSignature(postData.Bytes())
@@ -229,7 +237,7 @@ func (agent *Agent) Post(url string, data []byte, compressed bool) (resp *http.R
 	return
 }
 
-func (agent *Agent) SendMetric(key string) error {
+func (agent *Agent) SendMetric(ctx context.Context, key string) error {
 	metric, ok := agent.Metrics[key]
 	if !ok {
 		return errs.ErrorMetricDoesNotExist
@@ -246,7 +254,7 @@ func (agent *Agent) SendMetric(key string) error {
 		return errs.ErrorWrongPath
 	}
 
-	if resp, err := agent.Post(postPath, data, true); err != nil {
+	if resp, err := agent.Post(ctx, postPath, data, true); err != nil {
 		if resp != nil {
 			resp.Body.Close()
 		}
@@ -255,7 +263,7 @@ func (agent *Agent) SendMetric(key string) error {
 	return nil
 }
 
-func (agent *Agent) SendMetricsBatch(metrics []model.Metric) error {
+func (agent *Agent) SendMetricsBatch(ctx context.Context, metrics []model.Metric) error {
 	data, err := json.Marshal(metrics)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metrics: %w", err)
@@ -263,7 +271,7 @@ func (agent *Agent) SendMetricsBatch(metrics []model.Metric) error {
 	logger.Infof("Sending batch metrics count=%d size=%d\n", len(metrics), len(data))
 
 	postPath := agent.address + "/updates/"
-	resp, err := agent.Post(postPath, data, true)
+	resp, err := agent.Post(ctx, postPath, data, true)
 	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
@@ -337,7 +345,7 @@ func (agent *Agent) startWorkers(ctx context.Context, inCh chan []model.Metric) 
 					return nil
 
 				case batch := <-inCh:
-					if err := agent.SendMetricsBatch(batch); err != nil {
+					if err := agent.SendMetricsBatch(ctx, batch); err != nil {
 						return err
 					}
 				}
@@ -394,4 +402,17 @@ func (agent *Agent) Run(ctx context.Context, pollInterval int, reportInterval in
 	})
 
 	return g.Wait()
+}
+
+func (agent *Agent) setRealIP() error {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	agent.realAddr = localAddr
+
+	return nil
 }
