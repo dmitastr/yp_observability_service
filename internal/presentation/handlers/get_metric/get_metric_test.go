@@ -87,7 +87,7 @@ func TestGetMetricHandler_ServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockSrv := service.NewMockServiceAbstract(ctrl)
+			mockSrv := service.NewMockIService(ctrl)
 			errValue := errFunc(tt.serviceErrOut)
 			mockSrv.EXPECT().GetMetric(gomock.Any(), gomock.Any()).Return(&metric, errValue).AnyTimes()
 
