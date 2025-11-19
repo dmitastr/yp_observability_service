@@ -122,7 +122,7 @@ func TestAgent_SendMetric(t *testing.T) {
 			cfg := agentenvconfig.New(srv.URL, 0, 0, "", 1)
 			agent, _ := NewAgent(cfg)
 			agent.UpdateMetricValueCounter("abc", 1)
-			err := agent.SendMetric(tt.keyToSend)
+			err := agent.SendMetric(t.Context(), tt.keyToSend)
 
 			if tt.wantErr {
 				assert.Error(t, err)

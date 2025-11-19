@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Address         *string `env:"ADDRESS" mapstructure:"address"`
+	GRPCAddress     *string `env:"GRPC_ADDRESS" mapstructure:"grpc-address"`
 	StoreInterval   *int    `env:"STORE_INTERVAL" mapstructure:"store_interval"`
 	FileStoragePath *string `env:"FILE_STORAGE_PATH" mapstructure:"store_file"`
 	Restore         *bool   `env:"RESTORE" mapstructure:"restore"`
@@ -28,6 +29,7 @@ type Config struct {
 func New() (*Config, error) {
 	flagSet := pflag.NewFlagSet("observability", pflag.ExitOnError)
 	flagSet.StringP("address", "a", "localhost:8080", "set app host and port")
+	flagSet.StringP("grpc-address", "g", "", "address for gRPC server")
 	flagSet.IntP("store_interval", "i", 300, "interval for storing data to the file in seconds, 0=stream writing")
 	flagSet.BoolP("restore", "r", false, "restore data from file")
 	flagSet.StringP("store_file", "f", "./data/data.json", "path for writing data")
@@ -49,6 +51,7 @@ func New() (*Config, error) {
 
 	// Bind environment variables
 	_ = viper.BindEnv("a", "ADDRESS")
+	_ = viper.BindEnv("grpc-address", "GRPC_ADDRESS")
 	_ = viper.BindEnv("i", "STORE_INTERVAL")
 	_ = viper.BindEnv("f", "FILE_STORAGE_PATH")
 	_ = viper.BindEnv("r", "RESTORE")

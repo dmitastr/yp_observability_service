@@ -8,9 +8,9 @@ import (
 	_ "net/http/pprof"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/dmitastr/yp_observability_service/internal/app"
+	serverenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,17 +32,22 @@ func main() {
 		stop()
 	}()
 
-	server, db, err := app.NewApp(ctx)
+	cfg, err := serverenvconfig.New()
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	observerApp, err := app.NewApp(ctx, cfg)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
+
 	// Server goroutine
 	g.Go(func() error {
-		logger.Infof("Starting app on address: %s\n", server.Addr)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("app error: %w", err)
+		if err := observerApp.RunHTTPServer(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("observerApp error: %w", err)
 		}
 		logger.Info("Server stopped")
 		return nil
@@ -51,16 +56,20 @@ func main() {
 	// Server shutdown goroutine
 	g.Go(func() error {
 		<-gCtx.Done()
-		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		return server.Shutdown(shutdownCtx)
+		return observerApp.Shutdown(ctx)
 	})
 
-	// Database closing goroutine
-	g.Go(func() error {
-		<-gCtx.Done()
-		return db.Close()
-	})
+	// Starting separate gRPC server
+	if observerApp.HasgRPCServer() {
+		g.Go(func() error {
+			return observerApp.RunGRPCServer()
+		})
+
+		g.Go(func() error {
+			<-gCtx.Done()
+			return observerApp.ShutdownGRPCServer()
+		})
+	}
 
 	if err := g.Wait(); err != nil {
 		logger.Infof("exit reason: %v", err)
