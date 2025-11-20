@@ -5,12 +5,15 @@ import (
 
 	"context"
 
-	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	"github.com/dmitastr/yp_observability_service/internal/agent/agent"
+	connclient "github.com/dmitastr/yp_observability_service/internal/agent/client"
 	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var metricsAgent *agent.Agent
 
 // Run initialized [cobra.Command] for args parsing and starts the app
 func Run(ctx context.Context) error {
@@ -30,12 +33,19 @@ func Run(ctx context.Context) error {
 
 			var cfg config.Config
 			// Unmarshal the configuration into the Config struct
+
 			if err := viper.Unmarshal(&cfg); err != nil {
-				return fmt.Errorf("unable to decode agent config: %w", err)
+				return fmt.Errorf("unable to decode metricsAgent config: %w", err)
 			}
-			agent, err := client.NewAgent(cfg)
+
+			client, err := connclient.NewClient(cfg)
 			if err != nil {
-				return fmt.Errorf("error initializing agent: %w", err)
+				return fmt.Errorf("error creating metricsAgent client: %w", err)
+			}
+
+			metricsAgent, err = agent.NewAgent(cfg, client)
+			if err != nil {
+				return fmt.Errorf("error initializing metricsAgent: %w", err)
 			}
 
 			logger.Infof("Starting client for app=%s, poll interval=%d, report interval=%d",
@@ -44,7 +54,7 @@ func Run(ctx context.Context) error {
 				*cfg.ReportInterval,
 			)
 
-			return agent.Run(ctx, *cfg.PollInterval, *cfg.ReportInterval)
+			return metricsAgent.Run(ctx, *cfg.PollInterval, *cfg.ReportInterval)
 		},
 	}
 
@@ -55,6 +65,7 @@ func Run(ctx context.Context) error {
 	rootCmd.Flags().String("k", "", "key for request signing")
 	rootCmd.Flags().String("crypto-key", "", "path to file with public key")
 	rootCmd.Flags().StringP("config", "c", "", "path to config file")
+	rootCmd.Flags().BoolP("grpc-enable", "g", false, "use gRPC client for sending requests")
 
 	_ = viper.BindPFlags(rootCmd.Flags())
 
@@ -68,7 +79,15 @@ func Run(ctx context.Context) error {
 	_ = viper.BindEnv("rate_limit", "RATE_LIMIT")
 	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
 	_ = viper.BindEnv("config", "CONFIG")
+	_ = viper.BindEnv("grpc-enable", "GRPC_ENABLE")
 
 	return rootCmd.Execute()
 
+}
+
+func Stop(ctx context.Context) error {
+	if metricsAgent != nil {
+		return metricsAgent.Stop(ctx)
+	}
+	return nil
 }

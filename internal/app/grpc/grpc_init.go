@@ -17,8 +17,8 @@ type App struct {
 	gRPCServer *grpc.Server
 }
 
-func NewApp(address string) *App {
-	server := NewServer()
+func NewApp(address string, observerService service.IService) *App {
+	server := NewServer(observerService)
 	return &App{address: address, gRPCServer: server}
 }
 
@@ -70,8 +70,8 @@ func (m MetricsServer) UpdateMetrics(ctx context.Context, in *genproto.UpdateMet
 	return &response, nil
 }
 
-func NewServer() *grpc.Server {
+func NewServer(observerService service.IService) *grpc.Server {
 	s := grpc.NewServer()
-	genproto.RegisterMetricsServer(s, MetricsServer{})
+	genproto.RegisterMetricsServer(s, MetricsServer{service: observerService})
 	return s
 }

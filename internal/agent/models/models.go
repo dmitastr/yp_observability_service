@@ -1,4 +1,4 @@
-package metric
+package models
 
 import (
 	"fmt"
@@ -7,11 +7,15 @@ import (
 	formattools "github.com/dmitastr/yp_observability_service/internal/common"
 )
 
+type RealIP struct{}
+
 type Metric interface {
 	ToString() [3]string
 	UpdateValue(value any) error
 	GetStringValue() string
 	GetValue() any
+	GetMType() string
+	GetID() string
 }
 
 type GaugeMetric struct {
@@ -45,6 +49,14 @@ func (m GaugeMetric) GetValue() any {
 	return m.Value
 }
 
+func (m GaugeMetric) GetMType() string {
+	return m.MType
+}
+
+func (m GaugeMetric) GetID() string {
+	return m.ID
+}
+
 type CounterMetric struct {
 	ID    string `json:"id"`
 	MType string `json:"type"`
@@ -74,4 +86,12 @@ func (m *CounterMetric) UpdateValue(value any) error {
 
 func (m CounterMetric) GetValue() any {
 	return m.Value
+}
+
+func (m CounterMetric) GetMType() string {
+	return m.MType
+}
+
+func (m CounterMetric) GetID() string {
+	return m.ID
 }

@@ -66,7 +66,7 @@ func NewApp(ctx context.Context, cfg *serverenvconfig.Config) (*App, error) {
 	}
 
 	if cfg.GRPCAddress != nil && *cfg.GRPCAddress != "" {
-		app.gRPCServer = grpcapp.NewApp(*cfg.GRPCAddress)
+		app.gRPCServer = grpcapp.NewApp(*cfg.GRPCAddress, observabilityService)
 	}
 
 	return app, nil

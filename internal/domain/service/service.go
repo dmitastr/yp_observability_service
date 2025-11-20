@@ -66,7 +66,12 @@ func (service Service) BatchUpdate(ctx context.Context, metrics []models.Metrics
 		return err
 	}
 
-	ip := ctx.Value(common.SenderInfo{}).(string)
+	var ip string
+	ip, ok := ctx.Value(common.SenderInfo{}).(string)
+	if !ok {
+		ip = "127.0.0.1"
+	}
+
 	auditData := data.NewData(metrics, ip)
 	if err := service.auditor.Notify(auditData); err != nil {
 		logger.Error(err)
