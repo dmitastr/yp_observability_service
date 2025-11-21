@@ -2,60 +2,52 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"time"
 
+	grpcapp "github.com/dmitastr/yp_observability_service/internal/app/grpc"
+	httpapp "github.com/dmitastr/yp_observability_service/internal/app/http"
+	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit"
 	"github.com/dmitastr/yp_observability_service/internal/domain/audit/listener"
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/certdecode"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/hash"
+	"github.com/dmitastr/yp_observability_service/internal/domain/service"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/ipchecker"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
 	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
 	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
 	"github.com/dmitastr/yp_observability_service/internal/repository/postgres_storage"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-
-	"github.com/dmitastr/yp_observability_service/internal/config/env_parser/server/server_env_config"
-	"github.com/dmitastr/yp_observability_service/internal/domain/service"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/get_metric"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/list_metric"
-	pingdatabase "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/ping_database"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metric"
-	updatemetricsbatch "github.com/dmitastr/yp_observability_service/internal/presentation/handlers/update_metrics_batch"
-	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/compress"
-	requestlogger "github.com/dmitastr/yp_observability_service/internal/presentation/middleware/request_logger"
 )
+
+type App struct {
+	httpServer *http.Server
+	gRPCServer *grpcapp.App
+	db         dbinterface.Database
+}
 
 // NewApp creates a new app, register all handlers and middleware
 // and inject necessary dependencies
-func NewApp(ctx context.Context) (*http.Server, dbinterface.Database, error) {
-	cfg, err := serverenvconfig.New()
-	if err != nil {
-		return nil, nil, err
-	}
-
+func NewApp(ctx context.Context, cfg *serverenvconfig.Config) (*App, error) {
 	var storage dbinterface.Database
+	var err error
+
 	if cfg.DBUrl == nil || *cfg.DBUrl == "" {
 		fileStorage := filestorage.New(cfg)
 		storage = db.NewStorage(cfg, fileStorage)
 	} else {
 		storage, err = postgresstorage.NewPG(ctx, cfg)
 		if err != nil {
-			return nil, storage, fmt.Errorf("error creating postgres storage: %w", err)
+			return nil, fmt.Errorf("error creating postgres storage: %w", err)
 		}
 	}
 
-	if err = storage.Init("file://migrations"); err != nil {
-		return nil, storage, fmt.Errorf("error initializing postgres storage: %w", err)
+	if err := storage.Init("file://migrations"); err != nil {
+		return nil, fmt.Errorf("error initializing postgres storage: %w", err)
 	}
-
-	router := chi.NewRouter()
 
 	pinger := postgrespinger.New()
 	auditor := audit.NewAuditor().
@@ -63,58 +55,57 @@ func NewApp(ctx context.Context) (*http.Server, dbinterface.Database, error) {
 		AddListener(listener.NewListener(listener.URLListenerType, cfg.AuditURL))
 
 	observabilityService := service.NewService(storage, pinger, auditor)
-
-	metricHandler := updatemetric.NewHandler(observabilityService)
-	metricBatchHandler := updatemetricsbatch.NewHandler(observabilityService)
-	getMetricHandler := getmetric.NewHandler(observabilityService)
-	listMetricsHandler := listmetric.NewHandler(observabilityService)
-	pingHandler := pingdatabase.New(observabilityService)
-	signedCheckHandler := hash.NewSignedChecker(cfg)
-	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
-
-	// middleware
-	router.Use(
-		requestlogger.Handle,
-		rsaDecodeHandler.Handle,
-		signedCheckHandler.Handle,
-	)
-
-	// Set path for profiling
-	router.Mount("/debug", middleware.Profiler())
-
-	// setting routes
-	router.Group(func(r chi.Router) {
-		r.Use(compress.HandleCompression)
-		r.Get(`/`, listMetricsHandler.ServeHTTP)
-
-		r.Route(`/update`, func(r chi.Router) {
-			r.Post(`/`, metricHandler.ServeHTTP)
-			r.Post(`/{mtype}/{name}/{value}`, metricHandler.ServeHTTP)
-		})
-
-		r.Post(`/updates/`, metricBatchHandler.ServeHTTP)
-		r.Get(`/ping`, pingHandler.ServeHTTP)
-
-	})
-
-	router.Group(func(r chi.Router) {
-		r.Use(compress.HandleDecompression)
-
-		r.Route(`/value`, func(r chi.Router) {
-			r.Post(`/`, getMetricHandler.ServeHTTP)
-			r.Get(`/{mtype}/{name}`, getMetricHandler.ServeHTTP)
-		})
-
-	})
-	server := &http.Server{
-		Addr:              *cfg.Address,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       5 * time.Second,
-		Handler:           router,
-		BaseContext: func(listener net.Listener) context.Context {
-			return ctx
-		},
+	ipValidator, err := ipchecker.New(*cfg.TrustedSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("error creating ip validator: %w", err)
 	}
 
-	return server, storage, nil
+	server, err := httpapp.NewServer(ctx, cfg, observabilityService, ipValidator)
+	if err != nil {
+		return nil, fmt.Errorf("error creating server: %w", err)
+	}
+
+	app := &App{
+		httpServer: server,
+		db:         storage,
+	}
+
+	if cfg.GRPCAddress != nil && *cfg.GRPCAddress != "" {
+		app.gRPCServer = grpcapp.NewApp(*cfg.GRPCAddress, observabilityService, ipValidator)
+	}
+
+	return app, nil
+}
+
+func (app *App) RunHTTPServer() error {
+	logger.Infof("Starting app on address: %s\n", app.httpServer.Addr)
+
+	if err := app.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("app error: %w", err)
+	}
+	return nil
+}
+
+func (app *App) Shutdown(ctx context.Context) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	return errors.Join(app.db.Close(), app.httpServer.Shutdown(shutdownCtx))
+}
+
+func (app *App) HasgRPCServer() bool {
+	return app.gRPCServer != nil
+}
+
+func (app *App) RunGRPCServer() error {
+	logger.Info("Starting gRPC server")
+
+	app.gRPCServer.MustRun()
+	return nil
+}
+
+func (app *App) ShutdownGRPCServer() error {
+	logger.Info("Stopping gRPC server")
+	app.gRPCServer.Stop()
+	return nil
 }

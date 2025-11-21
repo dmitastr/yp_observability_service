@@ -1,10 +1,5 @@
 package agentenvconfig
 
-import (
-	"github.com/caarlos0/env/v6"
-	"github.com/dmitastr/yp_observability_service/internal/logger"
-)
-
 type Config struct {
 	Address        *string `env:"ADDRESS" mapstructure:"address" json:"address"`
 	PollInterval   *int    `env:"POLL_INTERVAL" mapstructure:"poll_interval" json:"poll_interval"`
@@ -12,27 +7,5 @@ type Config struct {
 	Key            *string `env:"KEY" mapstructure:"k"`
 	RateLimit      *int    `env:"RATE_LIMIT" mapstructure:"rate_limit" json:"rate_limit"`
 	PublicKeyFile  *string `env:"CRYPTO_KEY" mapstructure:"crypto-key" json:"crypto_key"`
-}
-
-func New(address string, pollInterval int, reportInterval int, key string, rateLimit int) (cfg Config) {
-	err := env.Parse(&cfg)
-	if err != nil {
-		logger.Errorf("error while reading env variables=%s", err)
-	}
-	if cfg.Address == nil {
-		cfg.Address = &address
-	}
-	if cfg.ReportInterval == nil {
-		cfg.ReportInterval = &reportInterval
-	}
-	if cfg.PollInterval == nil {
-		cfg.PollInterval = &pollInterval
-	}
-	if cfg.Key == nil {
-		cfg.Key = &key
-	}
-	if cfg.RateLimit == nil {
-		cfg.RateLimit = &rateLimit
-	}
-	return
+	GRPCEnable     *bool   `env:"GRPC_ENABLE" mapstructure:"grpc-enable" json:"grpc-enable"`
 }

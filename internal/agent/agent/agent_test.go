@@ -1,4 +1,4 @@
-package client
+package agent
 
 import (
 	"fmt"
@@ -6,15 +6,27 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dmitastr/yp_observability_service/internal/agent/client"
 	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-// DONE
+var gRPCDisable = false
+
 func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 	addr := `localhost:8080`
-	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
-	agent, _ := NewAgent(cfg)
+	cfg := agentenvconfig.Config{
+		Address:    &addr,
+		GRPCEnable: &gRPCDisable,
+	}
+
+	mockClient, mErr := client.NewClient(cfg)
+	if mErr != nil {
+		t.Fatal(mErr)
+	}
+
+	agent, _ := NewAgent(cfg, mockClient)
 	type args struct {
 		key   string
 		value int64
@@ -51,8 +63,17 @@ func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 
 func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 	addr := `localhost:8080`
-	cfg := agentenvconfig.New(addr, 0, 0, "", 1)
-	agent, _ := NewAgent(cfg)
+	cfg := agentenvconfig.Config{
+		GRPCEnable: &gRPCDisable,
+		Address:    &addr,
+	}
+
+	mockClient, mErr := client.NewClient(cfg)
+	if mErr != nil {
+		t.Fatal(mErr)
+	}
+
+	agent, _ := NewAgent(cfg, mockClient)
 
 	type args struct {
 		key   string
@@ -89,6 +110,9 @@ func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 }
 
 func TestAgent_SendMetric(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "send request to url=%s\n", r.URL)
 	}))
@@ -119,10 +143,19 @@ func TestAgent_SendMetric(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := agentenvconfig.New(srv.URL, 0, 0, "", 1)
-			agent, _ := NewAgent(cfg)
+			cfg := agentenvconfig.Config{
+				GRPCEnable: &gRPCDisable,
+				Address:    &srv.URL,
+			}
+
+			mockClient, mErr := client.NewClient(cfg)
+			if mErr != nil {
+				t.Fatal(mErr)
+			}
+
+			agent, _ := NewAgent(cfg, mockClient)
 			agent.UpdateMetricValueCounter("abc", 1)
-			err := agent.SendMetric(tt.keyToSend)
+			err := agent.SendMetric(t.Context(), tt.keyToSend)
 
 			if tt.wantErr {
 				assert.Error(t, err)
