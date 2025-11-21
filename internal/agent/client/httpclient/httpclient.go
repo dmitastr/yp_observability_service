@@ -102,7 +102,7 @@ func (c *Client) Post(ctx context.Context, url string, data []byte, compressed b
 	var ip string
 	ip, ok := ipValue.(string)
 	if !ok {
-		ip = "127.0.0.1"
+		ip = ""
 	}
 	req.Header.Set("X-Real-IP", ip)
 

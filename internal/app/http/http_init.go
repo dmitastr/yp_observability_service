@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -26,7 +25,7 @@ import (
 
 // NewServer creates a new server, register all handlers and middleware
 // and inject necessary dependencies
-func NewServer(ctx context.Context, cfg *serverenvconfig.Config, iService service.IService) (*http.Server, error) {
+func NewServer(ctx context.Context, cfg *serverenvconfig.Config, iService service.IService, ipValidator *ipchecker.IPValidator) (*http.Server, error) {
 	router := chi.NewRouter()
 
 	metricHandler := updatemetric.NewHandler(iService)
@@ -36,10 +35,6 @@ func NewServer(ctx context.Context, cfg *serverenvconfig.Config, iService servic
 	pingHandler := pingdatabase.New(iService)
 	signedCheckHandler := hash.NewSignedChecker(cfg)
 	rsaDecodeHandler := certdecode.NewCertDecoder(*cfg.PrivateKeyPath)
-	ipValidator, err := ipchecker.New(*cfg.TrustedSubnet)
-	if err != nil {
-		return nil, fmt.Errorf("error creating ip validator: %w", err)
-	}
 
 	// middleware
 	router.Use(

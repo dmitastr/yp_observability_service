@@ -16,6 +16,7 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/domain/pinger/postgres_pinger"
 	"github.com/dmitastr/yp_observability_service/internal/domain/service"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"github.com/dmitastr/yp_observability_service/internal/presentation/middleware/ipchecker"
 	dbinterface "github.com/dmitastr/yp_observability_service/internal/repository"
 	"github.com/dmitastr/yp_observability_service/internal/repository/filestorage"
 	db "github.com/dmitastr/yp_observability_service/internal/repository/memstorage"
@@ -54,8 +55,12 @@ func NewApp(ctx context.Context, cfg *serverenvconfig.Config) (*App, error) {
 		AddListener(listener.NewListener(listener.URLListenerType, cfg.AuditURL))
 
 	observabilityService := service.NewService(storage, pinger, auditor)
+	ipValidator, err := ipchecker.New(*cfg.TrustedSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("error creating ip validator: %w", err)
+	}
 
-	server, err := httpapp.NewServer(ctx, cfg, observabilityService)
+	server, err := httpapp.NewServer(ctx, cfg, observabilityService, ipValidator)
 	if err != nil {
 		return nil, fmt.Errorf("error creating server: %w", err)
 	}
@@ -66,7 +71,7 @@ func NewApp(ctx context.Context, cfg *serverenvconfig.Config) (*App, error) {
 	}
 
 	if cfg.GRPCAddress != nil && *cfg.GRPCAddress != "" {
-		app.gRPCServer = grpcapp.NewApp(*cfg.GRPCAddress, observabilityService)
+		app.gRPCServer = grpcapp.NewApp(*cfg.GRPCAddress, observabilityService, ipValidator)
 	}
 
 	return app, nil

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	model "github.com/dmitastr/yp_observability_service/internal/agent/models"
+	"github.com/dmitastr/yp_observability_service/internal/agent/models"
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type Client struct {
@@ -30,11 +31,19 @@ func NewClient(cfg config.Config) (*Client, error) {
 	return &Client{client: c, conn: conn}, nil
 }
 
-func (c Client) SendMetric(ctx context.Context, m model.Metric) error {
-	return c.SendMetricsBatch(ctx, []model.Metric{m})
+func (c Client) SendMetric(ctx context.Context, m models.Metric) error {
+	return c.SendMetricsBatch(ctx, []models.Metric{m})
 }
 
-func (c Client) SendMetricsBatch(ctx context.Context, metrics []model.Metric) error {
+func (c Client) SendMetricsBatch(ctx context.Context, metrics []models.Metric) error {
+	ipValue := ctx.Value(models.RealIP{})
+
+	var ip string
+	ip, ok := ipValue.(string)
+	if !ok {
+		ip = ""
+	}
+
 	var metricsProto []*genproto.Metric
 	for _, metric := range metrics {
 		m := &genproto.Metric_builder{Id: metric.GetID()}
@@ -49,6 +58,9 @@ func (c Client) SendMetricsBatch(ctx context.Context, metrics []model.Metric) er
 		}
 		metricsProto = append(metricsProto, m.Build())
 	}
+
+	md := metadata.Pairs("x-real-ip", ip)
+	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	in := genproto.UpdateMetricsRequest_builder{Metrics: metricsProto}.Build()
 

@@ -4,8 +4,15 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
+	"github.com/dmitastr/yp_observability_service/internal/logger"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type IPValidator struct {
@@ -40,4 +47,32 @@ func (i *IPValidator) Handle(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// IPValidatorInterceptor logs the incoming request and outgoing response.
+func (i *IPValidator) IPValidatorInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	if i.trusted != nil {
+		logger.Info("Checking IP address")
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if ok {
+			ipAddr := md.Get("x-real-ip")
+			if len(ipAddr) > 0 {
+				addr, err := netip.ParseAddrPort(ipAddr[0])
+				if err != nil || !i.CheckIP(addr.Addr().AsSlice()) {
+					return nil, status.Errorf(codes.PermissionDenied, `IP is not in trusted subnet`)
+				}
+				logger.Infof("Processing request from IP: %s", addr.String())
+
+			}
+		}
+	}
+
+	// Log the incoming request
+	logger.Infof("Incoming request: Method: %s, Request: %+v", info.FullMethod, req)
+
+	// Call the next handler in the chain
+	resp, err := handler(ctx, req)
+
+	return resp, err
 }

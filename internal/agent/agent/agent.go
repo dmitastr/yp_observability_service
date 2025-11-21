@@ -161,7 +161,7 @@ func (agent *Agent) UpdateMetrics() error {
 }
 
 func (agent *Agent) addIP(ctx context.Context) context.Context {
-	ctx = context.WithValue(ctx, models.RealIP{}, agent.realAddr)
+	ctx = context.WithValue(ctx, models.RealIP{}, agent.realAddr.String())
 	return ctx
 }
 
