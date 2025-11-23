@@ -35,6 +35,9 @@ func main() {
 	}
 
 	metricsAgent, err := agent.NewAgent(cfg)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 	// Agent start goroutine

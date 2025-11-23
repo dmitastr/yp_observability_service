@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	"github.com/dmitastr/yp_observability_service/internal/agent/models"
 	agentenvconfig "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -21,12 +22,15 @@ func TestAgent_UpdateMetricValueCounter(t *testing.T) {
 		GRPCEnable: &gRPCDisable,
 	}
 
-	mockClient, mErr := client.NewClient(cfg)
+	mockClient, mErr := client.NewClient(&cfg)
 	if mErr != nil {
 		t.Fatal(mErr)
 	}
 
-	agent, _ := NewAgent(cfg, mockClient)
+	agent := Agent{
+		Metrics: make(map[string]models.Metric),
+		client:  mockClient,
+	}
 	type args struct {
 		key   string
 		value int64
@@ -68,12 +72,15 @@ func TestAgent_UpdateMetricValueGauge(t *testing.T) {
 		Address:    &addr,
 	}
 
-	mockClient, mErr := client.NewClient(cfg)
+	mockClient, mErr := client.NewClient(&cfg)
 	if mErr != nil {
 		t.Fatal(mErr)
 	}
 
-	agent, _ := NewAgent(cfg, mockClient)
+	agent := Agent{
+		Metrics: make(map[string]models.Metric),
+		client:  mockClient,
+	}
 
 	type args struct {
 		key   string
@@ -148,12 +155,16 @@ func TestAgent_SendMetric(t *testing.T) {
 				Address:    &srv.URL,
 			}
 
-			mockClient, mErr := client.NewClient(cfg)
+			mockClient, mErr := client.NewClient(&cfg)
 			if mErr != nil {
 				t.Fatal(mErr)
 			}
 
-			agent, _ := NewAgent(cfg, mockClient)
+			agent := Agent{
+				Metrics: make(map[string]models.Metric),
+				client:  mockClient,
+			}
+
 			agent.UpdateMetricValueCounter("abc", 1)
 			err := agent.SendMetric(t.Context(), tt.keyToSend)
 
