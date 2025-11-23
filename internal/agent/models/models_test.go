@@ -1,4 +1,4 @@
-package metric
+package models
 
 import (
 	"strconv"

@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Address         *string `env:"ADDRESS" mapstructure:"address"`
+	GRPCAddress     *string `env:"GRPC_ADDRESS" mapstructure:"grpc-address"`
 	StoreInterval   *int    `env:"STORE_INTERVAL" mapstructure:"store_interval"`
 	FileStoragePath *string `env:"FILE_STORAGE_PATH" mapstructure:"store_file"`
 	Restore         *bool   `env:"RESTORE" mapstructure:"restore"`
@@ -20,6 +21,7 @@ type Config struct {
 	AuditFile       *string `env:"AUDIT_FILE" mapstructure:"audit-file"`
 	AuditURL        *string `env:"AUDIT_URL" mapstructure:"audit-url"`
 	PrivateKeyPath  *string `env:"CRYPTO_KEY" mapstructure:"crypto-key"`
+	TrustedSubnet   *string `env:"TRUSTED_SUBNET" mapstructure:"trusted_subnet"`
 }
 
 // New reads command line and env arguments, reads config file if any
@@ -27,6 +29,7 @@ type Config struct {
 func New() (*Config, error) {
 	flagSet := pflag.NewFlagSet("observability", pflag.ExitOnError)
 	flagSet.StringP("address", "a", "localhost:8080", "set app host and port")
+	flagSet.StringP("grpc-address", "g", "", "address for gRPC server")
 	flagSet.IntP("store_interval", "i", 300, "interval for storing data to the file in seconds, 0=stream writing")
 	flagSet.BoolP("restore", "r", false, "restore data from file")
 	flagSet.StringP("store_file", "f", "./data/data.json", "path for writing data")
@@ -36,6 +39,7 @@ func New() (*Config, error) {
 	flagSet.String("audit-url", "", "url for audit logs")
 	flagSet.String("crypto-key", "", "path to file with private key")
 	flagSet.StringP("config", "c", "", "path to config file")
+	flagSet.StringP("trusted_subnet", "t", "", "trusted subnet in CIDR format")
 
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
 		return nil, fmt.Errorf("error parsing flags: %w", err)
@@ -47,6 +51,7 @@ func New() (*Config, error) {
 
 	// Bind environment variables
 	_ = viper.BindEnv("a", "ADDRESS")
+	_ = viper.BindEnv("grpc-address", "GRPC_ADDRESS")
 	_ = viper.BindEnv("i", "STORE_INTERVAL")
 	_ = viper.BindEnv("f", "FILE_STORAGE_PATH")
 	_ = viper.BindEnv("r", "RESTORE")
@@ -56,6 +61,7 @@ func New() (*Config, error) {
 	_ = viper.BindEnv("audit-url", "AUDIT_URL")
 	_ = viper.BindEnv("crypto-key", "CRYPTO_KEY")
 	_ = viper.BindEnv("config", "CONFIG")
+	_ = viper.BindEnv("trusted_subnet", "TRUSTED_SUBNET")
 
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
 		viper.SetConfigFile(cfgPath)

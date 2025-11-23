@@ -3,11 +3,13 @@ package models
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/presentation/update"
+	"github.com/dmitastr/yp_observability_service/internal/proto/genproto"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -27,6 +29,24 @@ func FromUpdate(upd update.MetricUpdate) (m Metrics) {
 	m.ID = upd.MetricName
 	m.MType = upd.MType
 	return
+}
+
+// FromProto converts [genproto.Metric] to [Metrics]
+func FromProto(m *genproto.Metric) Metrics {
+	metric := Metrics{
+		ID:    m.GetId(),
+		MType: strings.ToLower(m.GetType().String()),
+	}
+	switch metric.MType {
+	case common.GAUGE:
+		value := m.GetValue()
+		metric.Value = &value
+	case common.COUNTER:
+		delta := m.GetDelta()
+		metric.Delta = &delta
+	}
+
+	return metric
 }
 
 // UpdateDelta increment Delta value or set it if it's nil
