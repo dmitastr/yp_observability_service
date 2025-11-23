@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/dmitastr/yp_observability_service/internal/agent/compress"
 	"github.com/dmitastr/yp_observability_service/internal/agent/models"
 	"github.com/dmitastr/yp_observability_service/internal/agent/rsaencoder"
@@ -19,7 +21,6 @@ import (
 	"github.com/dmitastr/yp_observability_service/internal/errs"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/hashicorp/go-retryablehttp"
-	"golang.org/x/net/context"
 )
 
 type Client struct {
@@ -30,7 +31,7 @@ type Client struct {
 	hashSigner *signature.HashSigner
 }
 
-func NewClient(cfg config.Config) (*Client, error) {
+func NewClient(cfg *config.Config) (*Client, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.HTTPClient.Timeout = time.Millisecond * 300
 	httpClient.RetryMax = 3

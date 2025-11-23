@@ -24,11 +24,12 @@ func NewApp(address string, observerService service.IService, ipValidator *ipche
 	return &App{address: address, gRPCServer: server, ipValidator: ipValidator}
 }
 
-// MustRun runs gRPC server and panics if any error occurs
-func (app *App) MustRun() {
+// Run runs gRPC server
+func (app *App) Run() error {
 	if err := app.run(); err != nil {
-		panic(err)
+		return fmt.Errorf("error while running agent: %w", err)
 	}
+	return nil
 }
 
 // Stop stops gRPC server

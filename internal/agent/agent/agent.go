@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dmitastr/yp_observability_service/internal/agent/client"
+	connclient "github.com/dmitastr/yp_observability_service/internal/agent/client"
 	"github.com/dmitastr/yp_observability_service/internal/agent/models"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -65,16 +65,21 @@ type Result struct {
 type Agent struct {
 	sync.Mutex
 	Metrics   map[string]models.Metric
-	Client    client.Client
+	client    connclient.Client
 	address   string
 	RateLimit int
 	realAddr  net.Addr
 }
 
-func NewAgent(cfg config.Config, client client.Client) (*Agent, error) {
+func NewAgent(cfg *config.Config) (*Agent, error) {
+	client, err := connclient.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating agent client: %w", err)
+	}
+
 	a := Agent{
 		Metrics: make(map[string]models.Metric),
-		Client:  client,
+		client:  client,
 	}
 
 	if cfg.RateLimit != nil {
@@ -161,7 +166,9 @@ func (agent *Agent) UpdateMetrics() error {
 }
 
 func (agent *Agent) addIP(ctx context.Context) context.Context {
-	ctx = context.WithValue(ctx, models.RealIP{}, agent.realAddr.String())
+	if agent.realAddr != nil {
+		ctx = context.WithValue(ctx, models.RealIP{}, agent.realAddr.String())
+	}
 	return ctx
 }
 
@@ -171,7 +178,7 @@ func (agent *Agent) SendMetric(ctx context.Context, key string) error {
 	if !ok {
 		return errs.ErrorMetricDoesNotExist
 	}
-	if err := agent.Client.SendMetric(ctx, metric); err != nil {
+	if err := agent.client.SendMetric(ctx, metric); err != nil {
 		return fmt.Errorf("error sending metric: %w", err)
 	}
 
@@ -180,7 +187,7 @@ func (agent *Agent) SendMetric(ctx context.Context, key string) error {
 
 func (agent *Agent) SendMetricsBatch(ctx context.Context, metrics []models.Metric) error {
 	ctx = agent.addIP(ctx)
-	if err := agent.Client.SendMetricsBatch(ctx, metrics); err != nil {
+	if err := agent.client.SendMetricsBatch(ctx, metrics); err != nil {
 		return fmt.Errorf("error sending metrics batch: %w", err)
 	}
 
@@ -296,5 +303,5 @@ func (agent *Agent) setRealIP() error {
 }
 
 func (agent *Agent) Stop(ctx context.Context) error {
-	return agent.Client.Close(ctx)
+	return agent.client.Close(ctx)
 }

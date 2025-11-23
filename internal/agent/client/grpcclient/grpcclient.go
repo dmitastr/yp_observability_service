@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"context"
+
 	"github.com/dmitastr/yp_observability_service/internal/agent/models"
 	"github.com/dmitastr/yp_observability_service/internal/common"
 	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"github.com/dmitastr/yp_observability_service/internal/proto/genproto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -20,7 +21,7 @@ type Client struct {
 	conn   *grpc.ClientConn
 }
 
-func NewClient(cfg config.Config) (*Client, error) {
+func NewClient(cfg *config.Config) (*Client, error) {
 	conn, err := grpc.NewClient(*cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Fatalf("could not create grpc client: %v", err)

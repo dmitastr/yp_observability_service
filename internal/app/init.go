@@ -100,7 +100,7 @@ func (app *App) HasgRPCServer() bool {
 func (app *App) RunGRPCServer() error {
 	logger.Info("Starting gRPC server")
 
-	app.gRPCServer.MustRun()
+	app.gRPCServer.Run()
 	return nil
 }
 

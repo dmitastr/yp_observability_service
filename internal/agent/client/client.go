@@ -1,11 +1,12 @@
 package client
 
 import (
+	"context"
+
 	"github.com/dmitastr/yp_observability_service/internal/agent/client/grpcclient"
 	"github.com/dmitastr/yp_observability_service/internal/agent/client/httpclient"
 	model "github.com/dmitastr/yp_observability_service/internal/agent/models"
 	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
-	"golang.org/x/net/context"
 )
 
 type Client interface {
@@ -14,7 +15,7 @@ type Client interface {
 	Close(context.Context) error
 }
 
-func NewClient(cfg config.Config) (Client, error) {
+func NewClient(cfg *config.Config) (Client, error) {
 	if *cfg.GRPCEnable {
 		return grpcclient.NewClient(cfg)
 	}

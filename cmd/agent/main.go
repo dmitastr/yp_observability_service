@@ -6,7 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	agent "github.com/dmitastr/yp_observability_service/internal/agent/init"
+	"github.com/dmitastr/yp_observability_service/internal/agent/agent"
+	config "github.com/dmitastr/yp_observability_service/internal/config/env_parser/agent/agent_env_config"
 	"github.com/dmitastr/yp_observability_service/internal/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -28,10 +29,17 @@ func main() {
 		stop()
 	}()
 
+	cfg, err := config.NewConfig()
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	metricsAgent, err := agent.NewAgent(cfg)
+
 	g, gCtx := errgroup.WithContext(ctx)
 	// Agent start goroutine
 	g.Go(func() error {
-		if err := agent.Run(ctx); err != nil {
+		if err := metricsAgent.Run(ctx, *cfg.PollInterval, *cfg.ReportInterval); err != nil {
 			return fmt.Errorf("agent error: %w", err)
 		}
 		logger.Info("Agent stopped")
@@ -41,7 +49,7 @@ func main() {
 	// Agent shutdown goroutine
 	g.Go(func() error {
 		<-gCtx.Done()
-		return agent.Stop(gCtx)
+		return metricsAgent.Stop(gCtx)
 	})
 
 	if err := g.Wait(); err != nil {
